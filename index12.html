@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Jeu à Deux - P2P</title>
+    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+        body { 
+            background: #0f0e17; 
+            color: #fffffe; 
+            padding: 16px; 
+            min-height: 100vh; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            margin: 0; 
+        }
+        .card { 
+            max-width: 600px; 
+            width: 100%; 
+            background: #1a1a2e; 
+            padding: 24px; 
+            border-radius: 28px; 
+            box-shadow: 0 12px 40px rgba(0,0,0,0.8); 
+        }
+        h1 { text-align: center; font-size: 1.8rem; margin: 0 0 4px; color: #ff8906; }
+        .sub { text-align: center; color: #a7a9be; margin-bottom: 20px; font-size: 0.85rem; }
+        .flex { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 12px; }
+        input, button { 
+            padding: 12px 18px; 
+            border: none; 
+            border-radius: 40px; 
+            font-size: 1rem; 
+            outline: none;
+        }
+        input { 
+            flex: 1; 
+            min-width: 130px; 
+            background: #0f0e17; 
+            color: #fffffe; 
+            border: 1px solid #ff8906; 
+        }
+        input::placeholder { color: #6a6a7a; }
+        button { 
+            background: #ff8906; 
+            color: #0f0e17; 
+            font-weight: 700; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+        }
+        button:hover { transform: scale(1.03); background: #e07b00; }
+        button.secondary { background: #2d2d44; color: #fffffe; }
+        button.secondary:hover { background: #3f3f5a; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .status { 
+            text-align: center; 
+            padding: 10px; 
+            background: #0f0e17; 
+            border-radius: 30px; 
+            margin: 14px 0; 
+            font-size: 0.9rem; 
+            color: #a7a9be; 
+            border: 1px solid #2d2d44;
+        }
+        .status.online { color: #4cc9f0; border-color: #4cc9f0; }
+        .status.connected { color: #4ade80; border-color: #4ade80; }
+        .status.error { color: #f87171; border-color: #f87171; }
+        #messageArea { 
+            background: #0f0e17; 
+            border-radius: 20px; 
+            padding: 14px; 
+            height: 260px; 
+            overflow-y: auto; 
+            margin: 12px 0; 
+            border: 1px solid #2d2d44; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 6px; 
+        }
+        .msg { 
+            padding: 10px 16px; 
+            border-radius: 18px; 
+            max-width: 80%; 
+            word-break: break-word; 
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .msg.me { background: #ff8906; color: #0f0e17; align-self: flex-end; }
+        .msg.other { background: #2d2d44; color: #fffffe; align-self: flex-start; }
+        .msg.system { background: transparent; color: #a7a9be; font-style: italic; text-align: center; align-self: center; font-size: 0.8rem; }
+        .input-row { display: flex; gap: 10px; margin-top: 6px; }
+        .input-row input { flex: 1; }
+        .presets { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 10px 0; }
+        .presets button { font-size: 0.8rem; padding: 6px 14px; background: #2d2d44; color: #fff; }
+        .presets button:hover { background: #ff8906; color: #0f0e17; transform: scale(1.02); }
+        #peerIdDisplay {
+            background: #0f0e17;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: #a7a9be;
+            text-align: center;
+            border: 1px dashed #3f3f5a;
+            margin: 6px 0 12px 0;
+            word-break: break-all;
+        }
+        #peerIdDisplay strong { color: #ff8906; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>🎲 Jeu à Deux</h1>
+    <p class="sub">💬 Connexion directe — sans serveur</p>
+
+    <!-- Zone de connexion -->
+    <div id="connectionZone">
+        <div class="flex">
+            <input type="text" id="roomInput" placeholder="Code salle (ex: amour)" value="couple2026">
+            <input type="text" id="nameInput" placeholder="Ton prénom" value="Moi">
+        </div>
+        <div class="flex">
+            <button id="createBtn">✨ Créer la salle</button>
+            <button id="joinBtn" class="secondary">🔗 Rejoindre</button>
+        </div>
+        <div id="status" class="status">🔴 Déconnecté</div>
+        <div id="peerIdDisplay" class="hidden">🔑 Ton ID : <strong id="myPeerId"></strong></div>
+    </div>
+
+    <!-- Zone de jeu -->
+    <div id="gameZone" class="hidden">
+        <div id="gameStatus" class="status">🟡 Connexion en cours...</div>
+        <div id="messageArea">
+            <div class="msg system">💡 Envoyez des défis ou des questions.</div>
+        </div>
+
+        <div class="presets">
+            <button data-preset="Action : Fais une danse ridicule pendant 10s">💃 Action</button>
+            <button data-preset="Vérité : Quel est ton plus grand défaut ?">🤔 Vérité</button>
+            <button data-preset="Question : Quand as-tu pensé à moi aujourd'hui ?">❤️ Perso</button>
+            <button data-preset="Je n'ai jamais... menti sur mon âge">🙈 Jamais</button>
+        </div>
+
+        <div class="input-row">
+            <input type="text" id="chatInput" placeholder="Écris ta question / défi...">
+            <button id="sendBtn">Envoyer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ============================================================
+    // 1. ÉLÉMENTS DOM
+    // ============================================================
+    const roomInput = document.getElementById('roomInput');
+    const nameInput = document.getElementById('nameInput');
+    const createBtn = document.getElementById('createBtn');
+    const joinBtn = document.getElementById('joinBtn');
+    const statusDiv = document.getElementById('status');
+    const peerIdDisplay = document.getElementById('peerIdDisplay');
+    const myPeerIdSpan = document.getElementById('myPeerId');
+    const gameZone = document.getElementById('gameZone');
+    const gameStatus = document.getElementById('gameStatus');
+    const messageArea = document.getElementById('messageArea');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const presetBtns = document.querySelectorAll('[data-preset]');
+
+    // ============================================================
+    // 2. ÉTAT
+    // ============================================================
+    let peer = null;
+    let connection = null;
+    let myName = 'Moi';
+    let isCreator = false;
+    let room = '';
+
+    // ============================================================
+    // 3. FONCTIONS MESSAGERIE
+    // ============================================================
+    function addMessage(text, type = 'system') {
+        const div = document.createElement('div');
+        div.classList.add('msg');
+        if (type === 'me') div.classList.add('me');
+        else if (type === 'other') div.classList.add('other');
+        else div.classList.add('system');
+        div.textContent = text;
+        messageArea.appendChild(div);
+        messageArea.scrollTop = messageArea.scrollHeight;
+    }
+
+    function sendMessage(text) {
+        if (!connection || connection.open === false) {
+            addMessage('❌ Pas de connexion active.', 'system');
+            return;
+        }
+        const payload = { from: myName, text: text };
+        connection.send(payload);
+        addMessage(`${myName} : ${text}`, 'me');
+        chatInput.value = '';
+    }
+
+    // ============================================================
+    // 4. NETTOYAGE
+    // ============================================================
+    function cleanup() {
+        if (connection) {
+            try { connection.close(); } catch(e) {}
+            connection = null;
+        }
+        if (peer) {
+            try { peer.destroy(); } catch(e) {}
+            peer = null;
+        }
+    }
+
+    // ============================================================
+    // 5. CONNEXION PEERJS (CORRIGÉE)
+    // ============================================================
+    function connectPeer(roomName, name, creator) {
+        cleanup();
+        myName = name.trim() || (creator ? 'Hôte' : 'Invité');
+        isCreator = creator;
+        room = roomName.trim().toLowerCase().replace(/\s+/g, '-');
+
+        // IDs fixes et prévisibles
+        const hostId = `${room}-host`;
+        const guestId = `${room}-guest`;
+
+        // L'ID qu'on va utiliser pour ce peer
+        const myId = creator ? hostId : guestId;
+
+        // Désactiver les boutons pendant la connexion
+        createBtn.disabled = true;
+        joinBtn.disabled = true;
+
+        statusDiv.textContent = `🔄 Connexion à PeerJS...`;
+        statusDiv.className = 'status';
+
+        peer = new Peer(myId, {
+            debug: 0, // mettre 2 pour voir les logs
+            // Serveur de signalisation public
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            }
+        });
+
+        // ---- Gestion des événements ----
+        peer.on('open', (id) => {
+            statusDiv.textContent = `✅ Connecté à PeerJS (ID: ${id})`;
+            statusDiv.className = 'status online';
+            document.getElementById('connectionZone').style.display = 'none';
+            gameZone.classList.remove('hidden');
+            gameStatus.textContent = `🟡 En attente de l'autre... (salle: ${room})`;
+            gameStatus.className = 'status';
+
+            // Afficher l'ID pour débogage
+            myPeerIdSpan.textContent = id;
+            peerIdDisplay.classList.remove('hidden');
+
+            // Si l'hôte, il écoute les connexions entrantes
+            if (creator) {
+                addMessage(`🔍 Salle "${room}" créée. Donne le code à l'autre.`, 'system');
+                peer.on('connection', (conn) => {
+                    if (connection) {
+                        // Refuser une deuxième connexion
+                        conn.close();
+                        addMessage('⚠️ Quelqu\'un a essayé de se connecter mais vous êtes déjà en couple !', 'system');
+                        return;
+                    }
+                    connection = conn;
+                    setupConnection(conn);
+                });
+            } else {
+                // L'invité tente de se connecter à l'hôte
+                addMessage(`🔗 Connexion à "${room}"...`, 'system');
+                const conn = peer.connect(hostId, { reliable: true });
+                connection = conn;
+                setupConnection(conn);
+
+                // Timeout si la connexion échoue
+                setTimeout(() => {
+                    if (connection && !connection.open) {
+                        gameStatus.textContent = '❌ Échec de connexion';
+                        gameStatus.className = 'status error';
+                        addMessage(`❌ Impossible de rejoindre "${room}". Vérifie que l'hôte a créé la salle.`, 'system');
+                        // Réactiver la zone de connexion après un échec
+                        setTimeout(() => resetUI(), 3000);
+                    }
+                }, 5000);
+            }
+        });
+
+        peer.on('error', (err) => {
+            console.error('PeerJS Error:', err);
+            let msg = '❌ Erreur : ';
+            if (err.type === 'unavailable-id') {
+                msg += `Le code "${room}" est déjà utilisé par quelqu\'un. Change le code.`;
+            } else if (err.type === 'peer-unavailable') {
+                msg += `L'hôte "${hostId}" n'existe pas. Demande à l'autre de créer la salle d'abord.`;
+            } else {
+                msg += err.message || err.type;
+            }
+            statusDiv.textContent = msg;
+            statusDiv.className = 'status error';
+            gameStatus.textContent = '❌ Erreur';
+            gameStatus.className = 'status error';
+            addMessage(msg, 'system');
+            // Réactiver après erreur
+            setTimeout(() => resetUI(), 3000);
+        });
+
+        // Nettoyage si la page se ferme
+        window.addEventListener('beforeunload', () => cleanup());
+    }
+
+    // ============================================================
+    // 6. GESTION DE LA CONNEXION ÉTABLIE
+    // ============================================================
+    function setupConnection(conn) {
+        conn.on('open', () => {
+            gameStatus.textContent = `🟢 Connecté(e) !`;
+            gameStatus.className = 'status connected';
+            addMessage(`🔗 Connexion établie ! 🎉`, 'system');
+            // Envoyer un message de bienvenue
+            conn.send({ from: myName, text: `👋 ${myName} est connecté !` });
+        });
+
+        conn.on('data', (data) => {
+            if (data && data.text) {
+                const from = data.from || 'L\'autre';
+                addMessage(`${from} : ${data.text}`, 'other');
+            }
+        });
+
+        conn.on('close', () => {
+            gameStatus.textContent = '🔴 Déconnecté';
+            gameStatus.className = 'status error';
+            addMessage('❌ L\'autre s\'est déconnecté.', 'system');
+            // Réactiver la connexion après un délai
+            setTimeout(() => resetUI(), 4000);
+        });
+
+        conn.on('error', (err) => {
+            console.error('Connection error:', err);
+            addMessage(`⚠️ Erreur de connexion: ${err.message}`, 'system');
+        });
+    }
+
+    // ============================================================
+    // 7. RÉINITIALISER L'INTERFACE
+    // ============================================================
+    function resetUI() {
+        cleanup();
+        document.getElementById('connectionZone').style.display = 'block';
+        gameZone.classList.add('hidden');
+        peerIdDisplay.classList.add('hidden');
+        statusDiv.textContent = '🔴 Déconnecté';
+        statusDiv.className = 'status';
+        createBtn.disabled = false;
+        joinBtn.disabled = false;
+        // Vider la zone de messages sauf le premier
+        messageArea.innerHTML = '<div class="msg system">💡 Crée ou rejoint une salle pour commencer.</div>';
+    }
+
+    // ============================================================
+    // 8. ÉVÉNEMENTS
+    // ============================================================
+    createBtn.addEventListener('click', () => {
+        const room = roomInput.value.trim() || 'couple';
+        const name = nameInput.value.trim() || 'Hôte';
+        connectPeer(room, name, true);
+    });
+
+    joinBtn.addEventListener('click', () => {
+        const room = roomInput.value.trim() || 'couple';
+        const name = nameInput.value.trim() || 'Invité';
+        connectPeer(room, name, false);
+    });
+
+    sendBtn.addEventListener('click', () => {
+        const text = chatInput.value.trim();
+        if (text) sendMessage(text);
+    });
+
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendBtn.click();
+    });
+
+    presetBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            chatInput.value = btn.dataset.preset;
+            sendBtn.click();
+        });
+    });
+
+    // Message initial
+    addMessage('💡 Crée ou rejoint une salle pour commencer.', 'system');
+
+    // ============================================================
+    // 9. FONCTION DE TEST DE CONNEXION (optionnelle)
+    // ============================================================
+    console.log('💡 Jeu à Deux chargé. Utilise "Créer" et "Rejoindre" avec le même code.');
+</script>
+</body>
+</html>
