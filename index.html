@@ -1,641 +1,1665 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>❤️ Jeu à Deux - Connexion Directe</title>
-    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
-    <style>
-        * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
-        body { 
-            background: #0f0e17; 
-            color: #fffffe; 
-            padding: 16px; 
-            min-height: 100vh; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            margin: 0; 
-        }
-        .card { 
-            max-width: 650px; 
-            width: 100%; 
-            background: #1a1a2e; 
-            padding: 24px; 
-            border-radius: 28px; 
-            box-shadow: 0 12px 40px rgba(0,0,0,0.8); 
-        }
-        h1 { text-align: center; font-size: 1.8rem; margin: 0 0 4px; color: #ff8906; }
-        .sub { text-align: center; color: #a7a9be; margin-bottom: 20px; font-size: 0.85rem; }
-        .flex { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 12px; }
-        input, button { 
-            padding: 12px 18px; 
-            border: none; 
-            border-radius: 40px; 
-            font-size: 1rem; 
-            outline: none;
-        }
-        input { 
-            flex: 1; 
-            min-width: 130px; 
-            background: #0f0e17; 
-            color: #fffffe; 
-            border: 1px solid #ff8906; 
-        }
-        input::placeholder { color: #6a6a7a; }
-        button { 
-            background: #ff8906; 
-            color: #0f0e17; 
-            font-weight: 700; 
-            cursor: pointer; 
-            transition: all 0.2s; 
-        }
-        button:hover { transform: scale(1.03); background: #e07b00; }
-        button.secondary { background: #2d2d44; color: #fffffe; }
-        button.secondary:hover { background: #3f3f5a; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-        .status { 
-            text-align: center; 
-            padding: 10px; 
-            background: #0f0e17; 
-            border-radius: 30px; 
-            margin: 14px 0; 
-            font-size: 0.9rem; 
-            color: #a7a9be; 
-            border: 1px solid #2d2d44;
-            transition: all 0.3s;
-        }
-        .status.online { color: #4cc9f0; border-color: #4cc9f0; }
-        .status.connected { color: #4ade80; border-color: #4ade80; }
-        .status.error { color: #f87171; border-color: #f87171; }
-        .status.warning { color: #fbbf24; border-color: #fbbf24; }
-        #messageArea { 
-            background: #0f0e17; 
-            border-radius: 20px; 
-            padding: 14px; 
-            height: 280px; 
-            overflow-y: auto; 
-            margin: 12px 0; 
-            border: 1px solid #2d2d44; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 6px; 
-        }
-        .msg { 
-            padding: 10px 16px; 
-            border-radius: 18px; 
-            max-width: 85%; 
-            word-break: break-word; 
-            animation: fadeIn 0.3s ease;
-        }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-        .msg.me { background: #ff8906; color: #0f0e17; align-self: flex-end; }
-        .msg.other { background: #2d2d44; color: #fffffe; align-self: flex-start; }
-        .msg.system { background: transparent; color: #a7a9be; font-style: italic; text-align: center; align-self: center; font-size: 0.8rem; }
-        .input-row { display: flex; gap: 10px; margin-top: 6px; }
-        .input-row input { flex: 1; }
-        .presets { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 10px 0; }
-        .presets button { font-size: 0.8rem; padding: 6px 14px; background: #2d2d44; color: #fff; }
-        .presets button:hover { background: #ff8906; color: #0f0e17; transform: scale(1.02); }
-        #infoBox {
-            background: #0f0e17;
-            padding: 10px 14px;
-            border-radius: 16px;
-            font-size: 0.75rem;
-            color: #a7a9be;
-            text-align: center;
-            border: 1px solid #2d2d44;
-            margin: 8px 0 12px 0;
-            word-break: break-all;
-            font-family: monospace;
-        }
-        #infoBox strong { color: #ff8906; }
-        .hidden { display: none !important; }
-        .connection-helper {
-            background: #1a1a2e;
-            border: 1px solid #2d2d44;
-            border-radius: 16px;
-            padding: 14px;
-            margin: 12px 0;
-            font-size: 0.85rem;
-        }
-        .connection-helper code {
-            background: #0f0e17;
-            padding: 2px 8px;
-            border-radius: 6px;
-            color: #4cc9f0;
-        }
-        .copy-btn {
-            background: #2d2d44;
-            color: #fff;
-            padding: 4px 12px;
-            font-size: 0.7rem;
-            border-radius: 20px;
-            cursor: pointer;
-        }
-        .copy-btn:hover { background: #3f3f5a; }
-    </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#0b0718"/>
+<title>Averi — Le jeu à deux, en direct</title>
+<script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
+<style>
+/* ==========================================================
+   AVERI — feuille de style
+   ========================================================== */
+:root{
+  --bg:#0b0718;
+  --bg2:#140b2b;
+  --ink:#f7f3ff;
+  --muted:#a99fc4;
+  --line:rgba(255,255,255,.10);
+  --glass:rgba(255,255,255,.055);
+  --rose:#ff5d8f;
+  --amber:#ffb457;
+  --violet:#9b6cff;
+  --cyan:#5fe1ff;
+  --green:#4ade80;
+  --red:#ff6b6b;
+  --grad-hot:linear-gradient(135deg,#ff5d8f,#ffb457);
+  --grad-cool:linear-gradient(135deg,#9b6cff,#5fe1ff);
+  --r-lg:26px; --r-md:18px; --r-sm:12px;
+  --shadow:0 18px 50px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+  overflow-x:hidden; line-height:1.45;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+button,input{font-family:inherit}
+
+/* ---------- Décor animé ---------- */
+#backdrop{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;background:
+  radial-gradient(1200px 700px at 15% -10%, #2a1350 0%, transparent 60%),
+  radial-gradient(900px 600px at 100% 0%, #3b1136 0%, transparent 55%),
+  radial-gradient(900px 900px at 50% 120%, #12183f 0%, transparent 60%), var(--bg);}
+.blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.42;mix-blend-mode:screen;animation:drift 26s ease-in-out infinite}
+.blob.b1{width:44vmax;height:44vmax;left:-14vmax;top:-16vmax;background:#ff5d8f}
+.blob.b2{width:38vmax;height:38vmax;right:-12vmax;top:6vmax;background:#9b6cff;animation-duration:32s;animation-delay:-6s}
+.blob.b3{width:40vmax;height:40vmax;left:22vmax;bottom:-22vmax;background:#5fe1ff;animation-duration:38s;animation-delay:-14s;opacity:.28}
+@keyframes drift{0%,100%{transform:translate3d(0,0,0) scale(1)}33%{transform:translate3d(6vmax,4vmax,0) scale(1.12)}66%{transform:translate3d(-5vmax,7vmax,0) scale(.94)}}
+#stars{position:absolute;inset:0;opacity:.55}
+#grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.045;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>")}
+#fx{position:fixed;inset:0;z-index:60;pointer-events:none}
+
+/* ---------- Structure ---------- */
+.wrap{position:relative;z-index:2;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px}
+.shell{width:100%;max-width:760px}
+.glass{background:var(--glass);border:1px solid var(--line);border-radius:var(--r-lg);
+  backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);box-shadow:var(--shadow)}
+.hidden{display:none!important}
+
+/* ---------- Typo ---------- */
+.brand{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:6px}
+.brand h1{margin:0;font-size:clamp(2rem,7vw,2.9rem);letter-spacing:-.03em;font-weight:800;
+  background:var(--grad-hot);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tagline{text-align:center;color:var(--muted);font-size:.92rem;margin:0 0 18px}
+.eyebrow{text-transform:uppercase;letter-spacing:.18em;font-size:.66rem;color:var(--muted);font-weight:700}
+
+/* ---------- Boutons ---------- */
+.btn{border:0;cursor:pointer;border-radius:999px;padding:13px 22px;font-size:.95rem;font-weight:700;color:#1a0b1f;
+  background:var(--grad-hot);box-shadow:0 10px 26px rgba(255,93,143,.32);transition:transform .18s,box-shadow .18s,filter .18s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 16px 34px rgba(255,93,143,.42)}
+.btn:active{transform:translateY(0) scale(.98)}
+.btn.ghost{background:rgba(255,255,255,.07);color:var(--ink);border:1px solid var(--line);box-shadow:none}
+.btn.ghost:hover{background:rgba(255,255,255,.13);box-shadow:none}
+.btn.cool{background:var(--grad-cool);color:#0a1030;box-shadow:0 10px 26px rgba(95,225,255,.25)}
+.btn.sm{padding:8px 15px;font-size:.8rem}
+.btn.xs{padding:6px 12px;font-size:.72rem}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none;filter:grayscale(.4)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row.center{justify-content:center}
+
+/* ---------- Champs ---------- */
+.field{position:relative;flex:1;min-width:150px}
+.field input{width:100%;padding:14px 16px 14px 44px;border-radius:16px;border:1px solid var(--line);
+  background:rgba(0,0,0,.32);color:var(--ink);font-size:.95rem;outline:none;transition:border-color .2s,box-shadow .2s}
+.field input:focus{border-color:var(--rose);box-shadow:0 0 0 4px rgba(255,93,143,.14)}
+.field .ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);opacity:.7;pointer-events:none}
+input::placeholder{color:#6f6689}
+
+/* ---------- Accueil ---------- */
+.hero{display:block;width:100%;max-width:420px;margin:0 auto 4px}
+.pane{padding:22px}
+.avatars{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:4px 0 16px}
+.av{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font-size:1.5rem;cursor:pointer;
+  border:2px solid transparent;background:rgba(255,255,255,.06);transition:transform .18s,border-color .18s,background .18s}
+.av:hover{transform:translateY(-3px) scale(1.06)}
+.av.sel{border-color:var(--amber);background:rgba(255,180,87,.16);box-shadow:0 0 0 4px rgba(255,180,87,.12)}
+.status{text-align:center;padding:11px 14px;border-radius:999px;margin:14px 0 0;font-size:.86rem;color:var(--muted);
+  border:1px solid var(--line);background:rgba(0,0,0,.28);transition:all .3s}
+.status.online{color:var(--cyan);border-color:rgba(95,225,255,.45)}
+.status.ok{color:var(--green);border-color:rgba(74,222,128,.45)}
+.status.err{color:var(--red);border-color:rgba(255,107,107,.45)}
+.status.warn{color:var(--amber);border-color:rgba(255,180,87,.45)}
+.idbox{margin-top:12px;padding:12px 14px;border-radius:16px;background:rgba(0,0,0,.32);border:1px dashed var(--line);
+  font-size:.78rem;color:var(--muted);display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+.idbox code{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--amber);word-break:break-all}
+details.helper{margin-top:12px;border:1px solid var(--line);border-radius:16px;background:rgba(0,0,0,.22);overflow:hidden}
+details.helper summary{cursor:pointer;padding:12px 16px;font-size:.85rem;color:var(--muted);list-style:none}
+details.helper summary::-webkit-details-marker{display:none}
+details.helper[open] summary{color:var(--ink);border-bottom:1px solid var(--line)}
+details.helper .body{padding:14px 16px}
+.hint{font-size:.76rem;color:#7d739a;margin-top:8px}
+
+/* ---------- Barre joueurs ---------- */
+.hud{display:flex;align-items:center;gap:10px;padding:12px 14px;margin-bottom:12px}
+.pcard{flex:1;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:16px;background:rgba(0,0,0,.26);
+  border:1px solid transparent;transition:border-color .3s,box-shadow .3s;min-width:0}
+.pcard.active{border-color:var(--amber);box-shadow:0 0 0 3px rgba(255,180,87,.14)}
+.pcard .face{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:1.25rem;flex:none;
+  background:var(--grad-cool);box-shadow:0 6px 16px rgba(0,0,0,.4)}
+.pcard.me .face{background:var(--grad-hot)}
+.pcard .meta{min-width:0}
+.pcard .nm{font-weight:700;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard .sc{font-size:.72rem;color:var(--muted)}
+.vs{font-weight:800;font-size:.72rem;color:var(--muted);letter-spacing:.1em;flex:none}
+.harmony{margin:0 14px 12px;height:8px;border-radius:999px;background:rgba(0,0,0,.34);overflow:hidden;position:relative}
+.harmony > i{display:block;height:100%;width:0%;border-radius:999px;background:var(--grad-hot);transition:width .6s cubic-bezier(.2,.9,.2,1)}
+.harmony-lbl{display:flex;justify-content:space-between;font-size:.68rem;color:var(--muted);margin:0 14px 6px}
+
+/* ---------- Menu des jeux ---------- */
+.games{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding:16px}
+.gtile{position:relative;overflow:hidden;cursor:pointer;border:1px solid var(--line);border-radius:22px;padding:16px 14px;
+  background:rgba(255,255,255,.045);text-align:left;color:var(--ink);transition:transform .2s,border-color .2s,background .2s}
+.gtile:hover{transform:translateY(-4px);border-color:rgba(255,180,87,.5);background:rgba(255,255,255,.08)}
+.gtile .art{width:100%;height:78px;display:block;margin-bottom:10px}
+.gtile h3{margin:0 0 3px;font-size:.98rem}
+.gtile p{margin:0;font-size:.74rem;color:var(--muted)}
+.gtile .tag{position:absolute;top:10px;right:12px;font-size:.62rem;padding:3px 8px;border-radius:999px;
+  background:rgba(0,0,0,.4);color:var(--amber);border:1px solid rgba(255,180,87,.3)}
+
+/* ---------- Plateau de jeu ---------- */
+.stage{padding:16px}
+.stage-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.stage-head h2{margin:0;font-size:1.05rem;display:flex;align-items:center;gap:8px}
+.turnpill{font-size:.72rem;padding:6px 12px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:rgba(0,0,0,.3)}
+.turnpill.mine{color:#1a0b1f;background:var(--grad-hot);border-color:transparent;font-weight:800;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,93,143,.5)}50%{box-shadow:0 0 0 10px rgba(255,93,143,0)}}
+
+/* Carte question */
+.deck{perspective:1200px;margin:6px 0 14px}
+.qcard{position:relative;border-radius:24px;padding:22px 20px;min-height:190px;display:flex;flex-direction:column;
+  justify-content:center;align-items:center;text-align:center;gap:12px;overflow:hidden;
+  border:1px solid var(--line);background:linear-gradient(160deg,rgba(255,255,255,.10),rgba(255,255,255,.03));
+  box-shadow:0 20px 44px rgba(0,0,0,.45);transform-style:preserve-3d;animation:dealIn .5s cubic-bezier(.2,.9,.25,1)}
+@keyframes dealIn{from{opacity:0;transform:rotateX(28deg) translateY(26px) scale(.94)}to{opacity:1;transform:none}}
+.qcard .watermark{position:absolute;right:-18px;bottom:-22px;width:170px;opacity:.14;pointer-events:none}
+.qcard .cat{font-size:.66rem;letter-spacing:.2em;text-transform:uppercase;color:var(--amber);font-weight:800}
+.qcard .txt{font-size:clamp(1.05rem,3.6vw,1.35rem);font-weight:600;max-width:34ch;position:relative;z-index:1}
+.qcard.empty{min-height:150px;color:var(--muted)}
+.qcard.hot{background:linear-gradient(160deg,rgba(255,93,143,.20),rgba(255,180,87,.06))}
+.qcard.cool{background:linear-gradient(160deg,rgba(155,108,255,.22),rgba(95,225,255,.06))}
+.qcard.deep{background:linear-gradient(160deg,rgba(95,225,255,.18),rgba(155,108,255,.06))}
+
+/* Choix */
+.choices{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+.choices.one{grid-template-columns:1fr}
+.choice{padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.05);
+  color:var(--ink);cursor:pointer;font-size:.9rem;font-weight:600;text-align:left;transition:all .18s;display:flex;align-items:center;gap:10px}
+.choice:hover:not(:disabled){border-color:var(--amber);background:rgba(255,180,87,.12);transform:translateY(-2px)}
+.choice.picked{border-color:var(--amber);background:rgba(255,180,87,.18);box-shadow:0 0 0 3px rgba(255,180,87,.12)}
+.choice.match{border-color:var(--green);background:rgba(74,222,128,.16)}
+.choice.miss{opacity:.5}
+.choice:disabled{cursor:default}
+.choice .k{width:26px;height:26px;border-radius:9px;display:grid;place-items:center;font-size:.75rem;flex:none;
+  background:rgba(0,0,0,.35);color:var(--amber);font-weight:800}
+.reveal{margin-top:12px;padding:14px;border-radius:18px;text-align:center;border:1px solid var(--line);background:rgba(0,0,0,.3);animation:dealIn .4s ease}
+.reveal .big{font-size:1.05rem;font-weight:800;margin-bottom:4px}
+.reveal.good .big{color:var(--green)}
+.reveal.bad .big{color:var(--amber)}
+.waiting{display:flex;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:.85rem;padding:12px}
+.dots i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--muted);margin:0 2px;animation:bounce 1.2s infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-6px);opacity:1}}
+
+/* Roue */
+.wheelbox{display:flex;flex-direction:column;align-items:center;gap:14px;padding:6px 0 4px}
+.wheelwrap{position:relative;width:min(260px,72vw);aspect-ratio:1}
+#wheel{width:100%;height:100%;transition:transform 4.2s cubic-bezier(.15,.85,.15,1);filter:drop-shadow(0 16px 30px rgba(0,0,0,.5))}
+.needle{position:absolute;top:-6px;left:50%;transform:translateX(-50%);font-size:1.7rem;filter:drop-shadow(0 3px 6px rgba(0,0,0,.6));z-index:2}
+
+/* Puissance 4 */
+.c4{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;padding:10px;border-radius:20px;
+  background:linear-gradient(160deg,rgba(155,108,255,.28),rgba(95,225,255,.10));border:1px solid var(--line);box-shadow:inset 0 2px 20px rgba(0,0,0,.4)}
+.cell{aspect-ratio:1;border-radius:50%;background:rgba(0,0,0,.45);display:grid;place-items:center;cursor:pointer;
+  border:1px solid rgba(255,255,255,.06);transition:transform .15s,background .2s;position:relative;overflow:hidden}
+.cell:hover{background:rgba(255,255,255,.10)}
+.cell .disc{width:82%;height:82%;border-radius:50%;display:grid;place-items:center;font-size:.9rem;animation:drop .38s cubic-bezier(.3,1.4,.5,1)}
+.cell .disc.h{background:var(--grad-hot);box-shadow:inset 0 -4px 10px rgba(0,0,0,.3)}
+.cell .disc.g{background:var(--grad-cool);box-shadow:inset 0 -4px 10px rgba(0,0,0,.3)}
+.cell.win{box-shadow:0 0 0 3px var(--amber),0 0 22px rgba(255,180,87,.6);animation:pulse 1.4s infinite}
+@keyframes drop{from{transform:translateY(-320%) scale(.8)}to{transform:none}}
+
+/* Memory */
+.mem{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.mtile{aspect-ratio:1;border-radius:16px;border:1px solid var(--line);background:linear-gradient(150deg,rgba(155,108,255,.32),rgba(255,93,143,.16));
+  display:grid;place-items:center;font-size:clamp(1.2rem,5vw,1.8rem);cursor:pointer;transition:transform .25s,opacity .3s;color:transparent}
+.mtile.up{background:rgba(255,255,255,.10);color:inherit;transform:rotateY(0)}
+.mtile.done{opacity:.34;cursor:default;background:rgba(74,222,128,.16);color:inherit}
+.mtile:not(.up):not(.done):hover{transform:translateY(-3px)}
+
+/* ---------- Chat ---------- */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;justify-content:center;padding:10px 12px calc(10px + env(safe-area-inset-bottom));pointer-events:none}
+.dock .inner{pointer-events:auto;width:100%;max-width:760px;display:flex;gap:8px;align-items:center}
+.chatpanel{position:fixed;z-index:45;left:50%;transform:translateX(-50%) translateY(120%);bottom:74px;width:min(760px,calc(100% - 24px));
+  max-height:min(56vh,460px);display:flex;flex-direction:column;transition:transform .34s cubic-bezier(.2,.9,.2,1);border-radius:24px;overflow:hidden}
+.chatpanel.open{transform:translateX(-50%) translateY(0)}
+.chatlog{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:7px}
+.chatlog::-webkit-scrollbar{width:6px}.chatlog::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:9px}
+.bub{padding:9px 14px;border-radius:16px;max-width:82%;font-size:.87rem;word-break:break-word;animation:dealIn .28s ease}
+.bub.me{align-self:flex-end;background:var(--grad-hot);color:#1a0b1f;border-bottom-right-radius:5px}
+.bub.you{align-self:flex-start;background:rgba(255,255,255,.10);border-bottom-left-radius:5px}
+.bub.sys{align-self:center;background:transparent;color:var(--muted);font-size:.75rem;font-style:italic;text-align:center;max-width:100%}
+.bub .who{display:block;font-size:.64rem;opacity:.7;margin-bottom:2px;font-weight:700}
+.chatbar{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line);background:rgba(0,0,0,.28)}
+.chatbar input{flex:1;padding:11px 15px;border-radius:999px;border:1px solid var(--line);background:rgba(0,0,0,.4);color:var(--ink);outline:none;font-size:.9rem}
+.chatbar input:focus{border-color:var(--rose)}
+.emotes{display:flex;gap:6px;padding:8px 10px;overflow-x:auto;border-top:1px solid var(--line)}
+.emotes button{flex:none;width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.05);font-size:1.15rem;cursor:pointer;transition:transform .15s}
+.emotes button:hover{transform:translateY(-3px) scale(1.12);background:rgba(255,180,87,.18)}
+.badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:999px;background:var(--rose);color:#fff;
+  font-size:.66rem;font-weight:800;display:grid;place-items:center;padding:0 5px}
+.iconbtn{position:relative;width:46px;height:46px;border-radius:16px;border:1px solid var(--line);background:rgba(20,11,43,.85);
+  backdrop-filter:blur(14px);color:var(--ink);font-size:1.15rem;cursor:pointer;flex:none;transition:transform .16s,background .2s}
+.iconbtn:hover{transform:translateY(-2px);background:rgba(255,255,255,.12)}
+
+/* Emote volante */
+.flying{position:fixed;z-index:70;font-size:2.4rem;pointer-events:none;animation:fly 2.4s ease-out forwards}
+@keyframes fly{0%{opacity:0;transform:translateY(20px) scale(.4)}12%{opacity:1;transform:translateY(0) scale(1.25)}
+  30%{transform:translateY(-10px) scale(1)}100%{opacity:0;transform:translateY(-180px) scale(.9)}}
+
+/* Toast */
+#toasts{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:80;display:flex;flex-direction:column;gap:8px;align-items:center;width:calc(100% - 24px);max-width:420px}
+.toast{padding:11px 18px;border-radius:999px;font-size:.83rem;font-weight:600;background:rgba(20,11,43,.94);
+  border:1px solid var(--line);box-shadow:var(--shadow);animation:tin .3s ease,tout .3s ease 3.2s forwards;backdrop-filter:blur(12px)}
+.toast.good{border-color:rgba(74,222,128,.5);color:var(--green)}
+.toast.bad{border-color:rgba(255,107,107,.5);color:var(--red)}
+@keyframes tin{from{opacity:0;transform:translateY(-14px)}}
+@keyframes tout{to{opacity:0;transform:translateY(-14px)}}
+
+@media (max-width:520px){
+  .pane{padding:18px}
+  .games{grid-template-columns:1fr 1fr;gap:9px;padding:12px}
+  .gtile{padding:12px 10px;border-radius:18px}
+  .gtile .art{height:60px}
+  .stage{padding:12px}
+  .hud{padding:10px}
+}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
 </head>
 <body>
-<div class="card">
-    <h1>🎲 Jeu à Deux</h1>
-    <p class="sub">💬 Connexion directe — Version améliorée</p>
 
-    <!-- Zone de connexion -->
-    <div id="connectionZone">
-        <div class="flex">
-            <input type="text" id="roomInput" placeholder="Code salle (ex: amour)" value="couple2026">
-            <input type="text" id="nameInput" placeholder="Ton prénom" value="Moi">
-        </div>
-        <div class="flex">
-            <button id="createBtn">✨ Créer la salle</button>
-            <button id="joinBtn" class="secondary">🔗 Rejoindre</button>
-        </div>
-        
-        <div id="status" class="status">🔴 Déconnecté</div>
-        
-        <div id="infoBox" class="hidden">
-            🆔 Ton ID : <strong id="myPeerId"></strong>
-            <button class="copy-btn" onclick="copyPeerId()">📋 Copier</button>
-        </div>
+<!-- ================= DÉCOR ================= -->
+<div id="backdrop">
+  <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+  <svg id="stars" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs><radialGradient id="stg"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+    <g fill="url(#stg)">
+      <circle cx="80" cy="70" r="1.6"><animate attributeName="opacity" values="0.2;1;0.2" dur="3.4s" repeatCount="indefinite"/></circle>
+      <circle cx="220" cy="140" r="1.1"><animate attributeName="opacity" values="1;0.15;1" dur="4.2s" repeatCount="indefinite"/></circle>
+      <circle cx="410" cy="60" r="1.9"><animate attributeName="opacity" values="0.3;1;0.3" dur="2.8s" repeatCount="indefinite"/></circle>
+      <circle cx="620" cy="120" r="1.3"><animate attributeName="opacity" values="0.8;0.2;0.8" dur="5s" repeatCount="indefinite"/></circle>
+      <circle cx="720" cy="300" r="1.7"><animate attributeName="opacity" values="0.2;1;0.2" dur="3.9s" repeatCount="indefinite"/></circle>
+      <circle cx="150" cy="380" r="1.2"><animate attributeName="opacity" values="1;0.2;1" dur="4.6s" repeatCount="indefinite"/></circle>
+      <circle cx="520" cy="470" r="1.5"><animate attributeName="opacity" values="0.25;1;0.25" dur="3.1s" repeatCount="indefinite"/></circle>
+      <circle cx="330" cy="520" r="1.1"><animate attributeName="opacity" values="0.9;0.2;0.9" dur="5.4s" repeatCount="indefinite"/></circle>
+      <circle cx="690" cy="540" r="1.4"><animate attributeName="opacity" values="0.2;1;0.2" dur="4.1s" repeatCount="indefinite"/></circle>
+    </g>
+  </svg>
+</div>
+<div id="grain"></div>
+<canvas id="fx"></canvas>
+<div id="toasts"></div>
 
-        <!-- Assistant de connexion -->
-        <div class="connection-helper" id="helperBox">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                <span>🔧 <strong>Mode manuel</strong></span>
-                <span style="font-size:0.75rem; color:#a7a9be;">Si la connexion automatique échoue</span>
-            </div>
-            <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-                <input type="text" id="manualPeerId" placeholder="ID de l'autre (ex: amour-host)" style="flex:1; min-width:120px; padding:8px 14px; font-size:0.8rem;">
-                <button id="manualConnectBtn" class="secondary" style="padding:8px 16px; font-size:0.8rem;">🔗 Connexion directe</button>
-            </div>
-            <div style="margin-top:6px; font-size:0.75rem; color:#6a6a7a;">
-                💡 L'hôte doit créer la salle en premier, puis l'invité utilise son ID affiché.
-            </div>
-        </div>
+<!-- ================= BIBLIOTHÈQUE D'ILLUSTRATIONS ================= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="gHot" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff5d8f"/><stop offset="1" stop-color="#ffb457"/></linearGradient>
+    <linearGradient id="gCool" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9b6cff"/><stop offset="1" stop-color="#5fe1ff"/></linearGradient>
+    <linearGradient id="gDeep" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#5fe1ff"/><stop offset="1" stop-color="#9b6cff"/></linearGradient>
+    <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd98a"/><stop offset="1" stop-color="#ff8f4d"/></linearGradient>
+
+    <!-- Coeur -->
+    <symbol id="ic-heart" viewBox="0 0 100 100">
+      <path d="M50 86C22 66 8 52 8 35 8 22 18 12 31 12c8 0 15 4 19 10 4-6 11-10 19-10 13 0 23 10 23 23 0 17-14 31-42 51z" fill="url(#gHot)"/>
+    </symbol>
+    <!-- Dés -->
+    <symbol id="ic-dice" viewBox="0 0 100 100">
+      <rect x="14" y="14" width="72" height="72" rx="18" fill="url(#gHot)"/>
+      <g fill="#1a0b1f"><circle cx="34" cy="34" r="6"/><circle cx="66" cy="34" r="6"/><circle cx="50" cy="50" r="6"/><circle cx="34" cy="66" r="6"/><circle cx="66" cy="66" r="6"/></g>
+    </symbol>
+    <!-- Bulle question -->
+    <symbol id="ic-bubble" viewBox="0 0 100 100">
+      <path d="M50 14c22 0 38 13 38 29S72 72 50 72c-4 0-8-.4-12-1.2L22 82l3-15C17 62 12 54 12 43c0-16 16-29 38-29z" fill="url(#gDeep)"/>
+      <text x="50" y="56" font-size="30" font-weight="800" text-anchor="middle" fill="#0b0718">?</text>
+    </symbol>
+    <!-- Main levée -->
+    <symbol id="ic-hand" viewBox="0 0 100 100">
+      <path d="M36 82c-10-4-16-14-16-26V38a6 6 0 0112 0v10V26a6 6 0 0112 0v20V20a6 6 0 0112 0v26V30a6 6 0 0112 0v28c0 14-8 24-22 24z" fill="url(#gCool)"/>
+    </symbol>
+    <!-- Balance / vote -->
+    <symbol id="ic-vote" viewBox="0 0 100 100">
+      <rect x="16" y="26" width="30" height="52" rx="8" fill="url(#gCool)"/>
+      <rect x="54" y="40" width="30" height="38" rx="8" fill="url(#gHot)"/>
+      <circle cx="31" cy="16" r="8" fill="#ffb457"/><circle cx="69" cy="30" r="8" fill="#9b6cff"/>
+    </symbol>
+    <!-- Grille puissance 4 -->
+    <symbol id="ic-grid" viewBox="0 0 100 100">
+      <rect x="10" y="18" width="80" height="64" rx="14" fill="url(#gCool)"/>
+      <g fill="#0b0718" opacity=".55"><circle cx="28" cy="36" r="8"/><circle cx="50" cy="36" r="8"/><circle cx="72" cy="36" r="8"/>
+      <circle cx="28" cy="60" r="8"/><circle cx="50" cy="60" r="8"/><circle cx="72" cy="60" r="8"/></g>
+      <circle cx="50" cy="60" r="8" fill="#ff5d8f"/><circle cx="28" cy="36" r="8" fill="#ffb457"/>
+    </symbol>
+    <!-- Cartes memory -->
+    <symbol id="ic-cards" viewBox="0 0 100 100">
+      <rect x="16" y="22" width="40" height="56" rx="10" fill="url(#gCool)" transform="rotate(-10 36 50)"/>
+      <rect x="44" y="22" width="40" height="56" rx="10" fill="url(#gHot)" transform="rotate(9 64 50)"/>
+      <text x="66" y="58" font-size="22" text-anchor="middle">💖</text>
+    </symbol>
+    <!-- Etoile -->
+    <symbol id="ic-star" viewBox="0 0 100 100">
+      <path d="M50 10l11 25 27 3-20 18 5 27-23-13-23 13 5-27L12 38l27-3z" fill="url(#gGold)"/>
+    </symbol>
+    <!-- Flamme -->
+    <symbol id="ic-fire" viewBox="0 0 100 100">
+      <path d="M50 8c4 16-8 20-14 30-7 11-2 22 6 26-9-14 4-19 6-30 6 8 18 14 18 28 0 14-11 26-26 26S14 76 14 62c0-24 26-30 36-54z" fill="url(#gHot)"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+<div class="shell">
+
+<!-- ================= ÉCRAN 1 : ACCUEIL ================= -->
+<section id="screenHome">
+  <div class="brand">
+    <svg width="38" height="38" aria-hidden="true"><use href="#ic-heart"/></svg>
+    <h1>Averi</h1>
+  </div>
+  <p class="tagline">Un jeu à deux, en connexion directe. Aucun serveur, aucun compte — juste vous deux.</p>
+
+  <!-- Illustration héros : deux mondes reliés -->
+  <svg class="hero" viewBox="0 0 420 190" aria-hidden="true">
+    <defs>
+      <radialGradient id="pA" cx="35%" cy="30%"><stop offset="0" stop-color="#ff8fb0"/><stop offset="1" stop-color="#c9295f"/></radialGradient>
+      <radialGradient id="pB" cx="35%" cy="30%"><stop offset="0" stop-color="#a9c4ff"/><stop offset="1" stop-color="#4a3ecb"/></radialGradient>
+      <linearGradient id="link" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#ff5d8f"/><stop offset=".5" stop-color="#ffb457"/><stop offset="1" stop-color="#5fe1ff"/>
+      </linearGradient>
+    </defs>
+    <!-- arc de connexion -->
+    <path id="arc" d="M96 108 Q210 22 324 108" fill="none" stroke="url(#link)" stroke-width="3" stroke-linecap="round" stroke-dasharray="7 9" opacity=".85">
+      <animate attributeName="stroke-dashoffset" from="64" to="0" dur="1.6s" repeatCount="indefinite"/>
+    </path>
+    <!-- paquet de données qui voyage -->
+    <circle r="5" fill="#fff"><animateMotion dur="2.6s" repeatCount="indefinite"><mpath href="#arc"/></animateMotion>
+      <animate attributeName="opacity" values="0;1;1;0" dur="2.6s" repeatCount="indefinite"/></circle>
+    <circle r="4" fill="#ffb457"><animateMotion dur="2.6s" begin="1.3s" repeatCount="indefinite"><mpath href="#arc"/></animateMotion></circle>
+    <!-- planète gauche -->
+    <g><circle cx="96" cy="112" r="40" fill="url(#pA)"/>
+      <ellipse cx="96" cy="112" rx="58" ry="14" fill="none" stroke="#ff5d8f" stroke-width="2.5" opacity=".55" transform="rotate(-16 96 112)"/>
+      <text x="96" y="122" font-size="30" text-anchor="middle">💜</text>
+      <animateTransform attributeName="transform" type="translate" values="0 0; 0 -7; 0 0" dur="6s" repeatCount="indefinite"/>
+    </g>
+    <!-- planète droite -->
+    <g><circle cx="324" cy="112" r="40" fill="url(#pB)"/>
+      <ellipse cx="324" cy="112" rx="58" ry="14" fill="none" stroke="#5fe1ff" stroke-width="2.5" opacity=".55" transform="rotate(14 324 112)"/>
+      <text x="324" y="122" font-size="30" text-anchor="middle">💙</text>
+      <animateTransform attributeName="transform" type="translate" values="0 0; 0 8; 0 0" dur="7s" repeatCount="indefinite"/>
+    </g>
+    <!-- coeur central -->
+    <g transform="translate(210 44)">
+      <use href="#ic-heart" x="-17" y="-17" width="34" height="34"/>
+      <animateTransform attributeName="transform" type="translate" values="0 0;0 -7;0 0" dur="2.2s" repeatCount="indefinite" additive="sum"/>
+    </g>
+  </svg>
+
+  <div class="glass pane">
+    <p class="eyebrow" style="text-align:center;margin:0 0 10px">Choisis ton visage</p>
+    <div class="avatars" id="avatarPicker"></div>
+
+    <div class="row" style="margin-bottom:10px">
+      <label class="field"><span class="ic">🙂</span><input id="nameInput" maxlength="16" placeholder="Ton prénom" value=""></label>
+      <label class="field"><span class="ic">🔑</span><input id="roomInput" maxlength="24" placeholder="Code secret de la salle" value=""></label>
     </div>
 
-    <!-- Zone de jeu -->
-    <div id="gameZone" class="hidden">
-        <div id="gameStatus" class="status">🟡 Connexion en cours...</div>
-        <div id="messageArea">
-            <div class="msg system">💡 Envoyez des défis ou des questions.</div>
-        </div>
-
-        <div class="presets">
-            <button data-preset="Action : Fais une danse ridicule pendant 10s">💃 Action</button>
-            <button data-preset="Vérité : Quel est ton plus grand défaut ?">🤔 Vérité</button>
-            <button data-preset="Question : Quand as-tu pensé à moi aujourd'hui ?">❤️ Perso</button>
-            <button data-preset="Je n'ai jamais... menti sur mon âge">🙈 Jamais</button>
-            <button data-preset="Défi : Envoie une photo de ton repas">📸 Défi</button>
-        </div>
-
-        <div class="input-row">
-            <input type="text" id="chatInput" placeholder="Écris ta question / défi...">
-            <button id="sendBtn">Envoyer</button>
-        </div>
+    <div class="row center">
+      <button class="btn" id="createBtn">✨ Créer la salle</button>
+      <button class="btn ghost" id="joinBtn">🔗 Rejoindre</button>
+      <button class="btn ghost" id="diceBtn" title="Code aléatoire">🎲</button>
     </div>
+
+    <div id="status" class="status">🔴 Hors ligne — crée une salle ou rejoins celle de l’autre</div>
+
+    <div id="idbox" class="idbox hidden">
+      <span>Ton identifiant :</span> <code id="myPeerId">—</code>
+      <button class="btn xs ghost" id="copyIdBtn">📋 Copier</button>
+      <button class="btn xs ghost" id="copyLinkBtn">🔗 Copier l’invitation</button>
+    </div>
+
+    <details class="helper">
+      <summary>🔧 La connexion automatique ne passe pas ? Mode manuel</summary>
+      <div class="body">
+        <div class="row">
+          <label class="field"><span class="ic">🆔</span><input id="manualPeerId" placeholder="Identifiant de l’autre"></label>
+          <button class="btn ghost sm" id="manualConnectBtn">Connexion directe</button>
+        </div>
+        <p class="hint">L’hôte crée la salle en premier, puis communique l’identifiant affiché. Le lien d’invitation fait la même chose automatiquement.</p>
+        <p class="hint">Tout transite en pair-à-pair (WebRTC). Rien n’est stocké : à la fermeture de l’onglet, la partie disparaît.</p>
+      </div>
+    </details>
+  </div>
+
+  <p class="tagline" style="margin-top:14px;font-size:.78rem">6 modes de jeu · 320 cartes · aucun serveur de jeu</p>
+</section>
+
+<!-- ================= ÉCRAN 2 : JEU ================= -->
+<section id="screenGame" class="hidden" style="padding-bottom:78px">
+
+  <!-- Tableau de bord des joueurs -->
+  <div class="glass hud" id="hud">
+    <div class="pcard me" id="pcardMe">
+      <div class="face" id="faceMe">🙂</div>
+      <div class="meta"><div class="nm" id="nameMe">Moi</div><div class="sc" id="scoreMe">0 pt</div></div>
+    </div>
+    <div class="vs">VS</div>
+    <div class="pcard" id="pcardYou">
+      <div class="face" id="faceYou">👤</div>
+      <div class="meta"><div class="nm" id="nameYou">En attente…</div><div class="sc" id="scoreYou">0 pt</div></div>
+    </div>
+  </div>
+
+  <div class="glass" style="padding-top:12px;margin-bottom:12px">
+    <div class="harmony-lbl"><span>💞 Harmonie du duo</span><span id="harmonyVal">—</span></div>
+    <div class="harmony"><i id="harmonyBar"></i></div>
+    <div style="padding:10px 14px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <span id="connBadge" class="turnpill">🟡 Connexion…</span>
+      <div class="row">
+        <button class="btn xs ghost" id="backMenuBtn">🎛️ Changer de jeu</button>
+        <button class="btn xs ghost" id="quitBtn">🚪 Quitter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menu des modes -->
+  <div id="gameMenu" class="glass">
+    <div style="padding:16px 16px 0"><p class="eyebrow">Choisissez une manche</p></div>
+    <div class="games" id="gamesGrid"></div>
+  </div>
+
+  <!-- Plateau -->
+  <div id="gameStage" class="glass stage hidden">
+    <div class="stage-head">
+      <h2><svg width="22" height="22" viewBox="0 0 100 100" id="stageIcon"><use href="#ic-heart"/></svg> <span id="stageTitle">Manche</span></h2>
+      <span class="turnpill" id="turnPill">—</span>
+    </div>
+    <div id="stageBody"></div>
+  </div>
+</section>
+
+</div><!-- /shell -->
+</div><!-- /wrap -->
+
+<!-- ================= CHAT ================= -->
+<div class="chatpanel glass hidden" id="chatPanel">
+  <div class="chatlog" id="chatLog"></div>
+  <div class="emotes" id="emoteBar"></div>
+  <div class="chatbar">
+    <input id="chatInput" maxlength="300" placeholder="Écris-lui un mot…">
+    <button class="btn sm" id="sendBtn">Envoyer</button>
+  </div>
 </div>
 
+<div class="dock" id="dock">
+  <div class="inner" style="justify-content:flex-end">
+    <button class="iconbtn" id="chatToggle" title="Discussion">💬<span class="badge hidden" id="chatBadge">0</span></button>
+  </div>
+</div>
 <script>
-    // ============================================================
-    // 1. ÉLÉMENTS DOM
-    // ============================================================
-    const roomInput = document.getElementById('roomInput');
-    const nameInput = document.getElementById('nameInput');
-    const createBtn = document.getElementById('createBtn');
-    const joinBtn = document.getElementById('joinBtn');
-    const statusDiv = document.getElementById('status');
-    const infoBox = document.getElementById('infoBox');
-    const myPeerIdSpan = document.getElementById('myPeerId');
-    const gameZone = document.getElementById('gameZone');
-    const gameStatus = document.getElementById('gameStatus');
-    const messageArea = document.getElementById('messageArea');
-    const chatInput = document.getElementById('chatInput');
-    const sendBtn = document.getElementById('sendBtn');
-    const presetBtns = document.querySelectorAll('[data-preset]');
-    const manualPeerId = document.getElementById('manualPeerId');
-    const manualConnectBtn = document.getElementById('manualConnectBtn');
+/* ==========================================================
+   AVERI — 1. BANQUE DE CONTENU
+   ========================================================== */
+const DATA = {};
 
-    // ============================================================
-    // 2. ÉTAT
-    // ============================================================
-    let peer = null;
-    let connection = null;
-    let myName = 'Moi';
-    let isCreator = false;
-    let room = '';
-    let reconnectAttempts = 0;
-    const MAX_RECONNECT = 3;
+/* --- Vérités (le joueur actif répond honnêtement) --- */
+DATA.truth = [
+  'Quelle est la première chose que tu as remarquée chez moi ?',
+  'Quel est le mensonge le plus gros que tu m’aies dit ?',
+  'Y a-t-il un message que tu as écrit puis effacé sans l’envoyer ?',
+  'Quel surnom secret est-ce que tu me donnes dans ta tête ?',
+  'Quelle est la chose la plus embarrassante de ton historique de recherche ?',
+  'À quoi penses-tu juste avant de t’endormir, ces temps-ci ?',
+  'Quel est ton plus grand défaut, celui que tu connais très bien ?',
+  'Quelle est la dernière fois où tu as pleuré, et pourquoi ?',
+  'De quoi as-tu le plus honte dans ton adolescence ?',
+  'Combien de fois as-tu relu un de mes messages aujourd’hui ?',
+  'Quelle habitude à moi t’agace sans que tu oses le dire ?',
+  'Qu’est-ce que tu ferais si tu savais que personne ne le saurait jamais ?',
+  'Quel est le compliment qui t’a le plus marqué dans ta vie ?',
+  'As-tu déjà fait semblant d’aimer un cadeau que je t’ai offert ?',
+  'Quelle est ta plus grande peur concernant nous deux ?',
+  'Quel est ton plus gros regret de l’année dernière ?',
+  'À quel moment as-tu su que tu tenais vraiment à moi ?',
+  'Quelle chanson te fait immédiatement penser à moi ?',
+  'Quel est le truc le plus bizarre que tu fais quand tu es seul·e ?',
+  'De quoi es-tu le plus fier·e, mais que tu n’oses pas raconter ?',
+  'Quelle est la dernière chose que tu as cherchée sur ton téléphone ?',
+  'Quel est ton pire souvenir de rendez-vous amoureux ?',
+  'Qu’est-ce qui te fait douter de toi le plus souvent ?',
+  'Y a-t-il une conversation que tu repousses depuis des semaines ?',
+  'Quelle est la chose la plus gentille que quelqu’un ait faite pour toi ?',
+  'Quel talent inutile as-tu que personne ne connaît ?',
+  'Qu’est-ce que tu aimerais que je te demande plus souvent ?',
+  'Quelle est ta pire manie à table ?',
+  'Quel est le film que tu prétends aimer pour paraître cultivé·e ?',
+  'Si tu pouvais effacer un souvenir, lequel choisirais-tu ?',
+  'Quel est le plus long temps que tu as passé sans dormir ?',
+  'Quelle est la dépense la plus stupide que tu aies faite ?',
+  'Qu’est-ce qui te rend instantanément de mauvaise humeur ?',
+  'À quelle situation repenses-tu encore le soir, des années après ?',
+  'Quelle promesse t’es-tu faite à toi-même et n’as pas tenue ?',
+  'Quel est le truc que tu ne veux surtout pas que je découvre ?',
+  'Qu’est-ce que tu envies chez moi ?',
+  'Quelle est la chose la plus impulsive que tu aies faite ?',
+  'Quel âge as-tu dans ta tête, vraiment ?',
+  'Qu’est-ce qui te manque le plus quand on est loin ?',
+  'Quel a été ton moment le plus solitaire ?',
+  'À quoi ressemblerait ta journée parfaite, heure par heure ?',
+  'Quelle est ta réaction quand je mets trop longtemps à répondre ?',
+  'Quel détail insignifiant chez moi te fait sourire ?',
+  'Quel conseil donnerais-tu à la version de toi d’il y a cinq ans ?',
+  'Quelle est la chose que tu n’as jamais dite à personne ?',
+  'Qu’est-ce qui t’a fait rire le plus fort cette semaine ?',
+  'Est-ce que tu as déjà fouillé dans mon téléphone ?',
+  'Quel est le pire message que tu aies envoyé à la mauvaise personne ?',
+  'Si notre histoire était un livre, quel serait le titre du chapitre actuel ?',
+  'Quel est le rêve que tu fais le plus souvent ?',
+  'Quelle est la chose la plus stupide pour laquelle tu t’es disputé·e ?',
+  'Combien de temps mets-tu vraiment à répondre quand tu dis « je viens de voir » ?',
+  'Quelle photo de toi refuses-tu de montrer ?',
+  'Quel est le pire cadeau que tu aies offert ?',
+  'Qu’est-ce que tu fais quand tu es jaloux·se ?',
+  'Quelle est la dernière chose qui t’a fait rougir ?',
+  'Quel est le prénom que tu détestes et pourquoi ?',
+  'As-tu déjà répété une réponse avant de m’appeler ?',
+  'Quelle est ta plus grosse superstition ?',
+  'Quel est le compliment que tu attends de moi depuis longtemps ?',
+  'Quelle est la chose la plus enfantine que tu fais encore ?',
+  'Quel est le dernier mensonge que tu as dit à ta famille ?',
+  'Qu’est-ce que tu regardes en premier chez quelqu’un ?',
+  'Quelle est la scène de notre histoire que tu rejoues dans ta tête ?'
+];
 
-    // ============================================================
-    // 3. FONCTIONS MESSAGERIE
-    // ============================================================
-    function addMessage(text, type = 'system') {
-        const div = document.createElement('div');
-        div.classList.add('msg');
-        if (type === 'me') div.classList.add('me');
-        else if (type === 'other') div.classList.add('other');
-        else div.classList.add('system');
-        div.textContent = text;
-        messageArea.appendChild(div);
-        messageArea.scrollTop = messageArea.scrollHeight;
+/* --- Défis (réalisables à distance) --- */
+DATA.dare = [
+  'Envoie un vocal de 10 secondes en chantant ta chanson préférée.',
+  'Fais une photo de l’endroit où tu es, sans rien ranger avant.',
+  'Imite ma façon de parler pendant 20 secondes.',
+  'Décris-moi en trois mots, sans réfléchir plus de cinq secondes.',
+  'Écris-moi un message en n’utilisant que des emojis pendant 2 tours.',
+  'Danse 15 secondes sans musique, et fais-le vraiment.',
+  'Montre la dernière photo de ta galerie, quelle qu’elle soit.',
+  'Envoie un message gentil à quelqu’un que tu n’as pas contacté depuis 6 mois.',
+  'Lis à voix haute ta dernière note de téléphone.',
+  'Fais un dessin de moi en 30 secondes et montre-le.',
+  'Prends la voix la plus grave possible pour dire « je t’aime bien ».',
+  'Raconte une blague. Si je ne ris pas, tu perds un point.',
+  'Fais 10 pompes ou 20 squats, en direct.',
+  'Compose un poème de quatre lignes sur mon prénom.',
+  'Montre-moi ton fond d’écran et explique pourquoi c’est celui-là.',
+  'Parle avec un accent de ton choix pendant tout le tour suivant.',
+  'Envoie une photo de ta tête avec la pire grimace possible.',
+  'Fais l’imitation de ton animal préféré, avec le son.',
+  'Écris une déclaration exagérément dramatique en 3 phrases.',
+  'Bois un grand verre d’eau d’une traite, maintenant.',
+  'Nomme 10 choses que tu aimes chez moi en moins de 30 secondes.',
+  'Fais une story mentale : décris ta journée comme un présentateur télé.',
+  'Montre-moi le contenu de ton sac ou de tes poches.',
+  'Envoie un vocal où tu chuchotes un secret sans importance.',
+  'Prends une photo artistique d’un objet banal près de toi.',
+  'Choisis un objet et vends-le-moi comme un vrai vendeur, 30 secondes.',
+  'Fais un compliment à toi-même, à voix haute, sans rire.',
+  'Écris mon prénom avec ton nez sur ton écran et envoie le résultat.',
+  'Chante la suite de la chanson que je vais t’écrire dans le chat.',
+  'Raconte le rêve le plus bizarre dont tu te souviens.',
+  'Rejoue notre première conversation, de mémoire.',
+  'Tiens en équilibre sur un pied pendant 30 secondes en me parlant.',
+  'Écris-moi un message dans une langue que tu ne parles pas.',
+  'Mets un vêtement à l’envers pour le reste de la partie.',
+  'Décris ta journée d’hier comme si c’était un film d’action.',
+  'Fais une pause de 20 secondes et dis-moi ce que tu entends autour de toi.',
+  'Prends une photo de ton pied gauche. Sans explication.',
+  'Envoie-moi une capture de ta playlist la plus honteuse.',
+  'Récite l’alphabet à l’envers. Le plus vite possible.',
+  'Fais semblant d’être moi pendant deux réponses.',
+  'Dessine un cœur sur ta main et montre-le.',
+  'Dis « je suis ridicule et j’assume » avec beaucoup de conviction.',
+  'Improvise une publicité de 20 secondes pour notre relation.',
+  'Trouve un objet qui a une histoire et raconte-la en une minute.',
+  'Écris-moi le message le plus cliché possible, sans ironie.',
+  'Fais un câlin à un coussin en pensant très fort à moi.',
+  'Montre-moi tes trois dernières recherches d’images.',
+  'Invente un cocktail avec ce que tu as chez toi et nomme-le.',
+  'Souris pendant 30 secondes sans t’arrêter, en me regardant.',
+  'Écris-moi ce que tu ferais si j’arrivais devant ta porte maintenant.',
+  'Envoie-moi une photo de ton reflet, tel quel, maintenant.',
+  'Fais la météo de ton humeur comme un présentateur, 20 secondes.',
+  'Écris-moi une excuse ridicule pour ne pas jouer, puis joue quand même.',
+  'Prends l’objet le plus proche et présente-le comme une relique sacrée.',
+  'Envoie un vocal en parlant à l’envers, je dois deviner.',
+  'Fais une liste à voix haute de cinq choses dont tu es reconnaissant·e.',
+  'Dessine notre relation en un seul trait, sans lever le crayon.',
+  'Change ta photo de profil pour un emoji pendant une heure.',
+  'Écris-moi le début d’une histoire, j’écris la suite.',
+  'Fais un compte à rebours dramatique de 10 à 0 avant de me dire un secret.'
+];
+
+/* --- Questions profondes --- */
+DATA.deep = [
+  'Qu’est-ce qui te fait te sentir vraiment en sécurité ?',
+  'Quelle version de toi as-tu peur que je découvre ?',
+  'Comment sais-tu que quelqu’un t’aime, concrètement ?',
+  'Qu’est-ce que tu voudrais que l’on fasse plus souvent, tous les deux ?',
+  'Quelle blessure du passé influence encore ta façon d’aimer ?',
+  'Qu’est-ce qui te donne l’impression d’être compris·e ?',
+  'De quoi as-tu besoin quand tu vas mal, exactement ?',
+  'Que veut dire « être heureux » pour toi, en une phrase ?',
+  'Quelle est la limite que tu ne veux jamais franchir dans un couple ?',
+  'Qu’est-ce que tu n’oses pas me demander ?',
+  'Où te vois-tu vivre dans cinq ans, et avec qui ?',
+  'Qu’est-ce qui te fait le plus peur dans le fait de vieillir ?',
+  'Quel héritage familial voudrais-tu garder, lequel abandonner ?',
+  'Qu’est-ce qui t’a le plus changé ces deux dernières années ?',
+  'Quelle place laisses-tu à ta propre solitude ?',
+  'Quand t’es-tu senti·e fier·e de toi pour la dernière fois ?',
+  'Qu’est-ce que la distance nous a appris, selon toi ?',
+  'Quel serait le signe que notre relation va vraiment bien ?',
+  'Qu’est-ce que tu pardonnes difficilement ?',
+  'Comment veux-tu qu’on se dispute, quand ça arrive ?',
+  'Qu’est-ce que je fais qui t’apaise sans que je m’en rende compte ?',
+  'Quel rêve as-tu abandonné, et le regrettes-tu ?',
+  'Quelle est la chose la plus courageuse que tu aies faite ?',
+  'Qu’est-ce qui te fait sentir désiré·e ?',
+  'Quel souvenir de nous voudrais-tu revivre à l’identique ?',
+  'Qu’est-ce que tu attends de moi que je ne donne pas encore ?',
+  'Quelle est ta définition de la fidélité ?',
+  'Quel sujet évitons-nous soigneusement tous les deux ?',
+  'Qu’est-ce qui te rend triste sans raison apparente ?',
+  'Si on devait tout recommencer, que ferais-tu différemment ?',
+  'Quel est le compliment que tu ne crois jamais quand on te le fait ?',
+  'Comment veux-tu être aimé·e : en mots, en gestes, en temps ?',
+  'Qu’est-ce qui te ferait dire que tu as réussi ta vie ?',
+  'Quelle est la chose la plus difficile que tu vives en ce moment ?',
+  'Qu’attends-tu de moi quand tu ne dis rien ?',
+  'Quelle est ta plus grande contradiction ?',
+  'Qu’est-ce que tu voudrais qu’on écrive sur nous dans dix ans ?',
+  'À quel moment t’es-tu senti·e le plus proche de moi ?',
+  'Qu’est-ce que tu ne veux surtout pas devenir ?',
+  'Quel silence entre nous t’a le plus pesé ?',
+  'Qu’est-ce qui te donne de l’espoir ces temps-ci ?',
+  'Quelle est la question que tu te poses le plus souvent ?',
+  'Qu’est-ce que tu voudrais m’avoir dit plus tôt ?',
+  'Que devrait-on s’autoriser à faire plus librement ?',
+  'Quel est le prix que tu es prêt·e à payer pour nous ?',
+  'Qu’est-ce qui te fait sentir vivant·e ?',
+  'Quelle partie de toi as-tu appris à accepter récemment ?',
+  'Qu’attends-tu vraiment d’une journée ordinaire à deux ?',
+  'De quoi as-tu peur de manquer dans ta vie ?',
+  'Quelle est la chose la plus vraie que tu m’aies dite ?',
+  'Comment reconnais-tu que tu es en train de te protéger ?',
+  'Qu’est-ce que tu voudrais que je comprenne sans avoir à l’expliquer ?',
+  'Quelle décision te fait le plus peur en ce moment ?',
+  'Qu’est-ce qui te ramène à toi-même quand tu te perds ?',
+  'À quoi ressemblerait notre vie si tout allait bien ?'
+];
+
+/* --- Je n’ai jamais --- */
+DATA.never = [
+  'Je n’ai jamais menti sur mon âge.',
+  'Je n’ai jamais fait semblant d’être malade pour éviter quelque chose.',
+  'Je n’ai jamais relu la conversation entière avec quelqu’un.',
+  'Je n’ai jamais pleuré devant un film d’animation.',
+  'Je n’ai jamais espionné le profil d’un ex.',
+  'Je n’ai jamais dormi plus de douze heures d’affilée.',
+  'Je n’ai jamais oublié un anniversaire important.',
+  'Je n’ai jamais chanté à tue-tête sous la douche.',
+  'Je n’ai jamais fait semblant de connaître une chanson.',
+  'Je n’ai jamais envoyé un message à la mauvaise personne.',
+  'Je n’ai jamais mangé un repas entier debout devant le frigo.',
+  'Je n’ai jamais menti pour protéger quelqu’un.',
+  'Je n’ai jamais fait un road trip improvisé.',
+  'Je n’ai jamais gardé un cadeau que je détestais.',
+  'Je n’ai jamais lu la fin d’un livre avant le début.',
+  'Je n’ai jamais dit « je t’aime » sans le penser.',
+  'Je n’ai jamais dansé seul·e dans ma chambre.',
+  'Je n’ai jamais eu le coup de foudre.',
+  'Je n’ai jamais raté un train ou un avion.',
+  'Je n’ai jamais fait semblant de dormir pour éviter une discussion.',
+  'Je n’ai jamais parlé tout seul à voix haute.',
+  'Je n’ai jamais gardé une rancune plus d’un an.',
+  'Je n’ai jamais annulé un plan à la dernière minute par flemme.',
+  'Je n’ai jamais pleuré de joie.',
+  'Je n’ai jamais menti sur un CV.',
+  'Je n’ai jamais fait la fête jusqu’au lever du soleil.',
+  'Je n’ai jamais regardé une série entière en une nuit.',
+  'Je n’ai jamais eu peur du noir à l’âge adulte.',
+  'Je n’ai jamais écrit une lettre que je n’ai jamais envoyée.',
+  'Je n’ai jamais fait un tatouage ou pensé sérieusement à en faire un.',
+  'Je n’ai jamais cassé quelque chose et accusé quelqu’un d’autre.',
+  'Je n’ai jamais eu un fou rire à un moment inapproprié.',
+  'Je n’ai jamais fait semblant d’aimer un plat par politesse.',
+  'Je n’ai jamais dormi dans un lieu public.',
+  'Je n’ai jamais oublié le prénom de quelqu’un en pleine conversation.',
+  'Je n’ai jamais fouillé dans les affaires de quelqu’un.',
+  'Je n’ai jamais fait un achat impulsif de plus de 100 €.',
+  'Je n’ai jamais gardé un secret pendant plus de cinq ans.',
+  'Je n’ai jamais prétendu avoir vu un film culte.',
+  'Je n’ai jamais eu un ami imaginaire.',
+  'Je n’ai jamais fait semblant d’avoir déjà lu un livre.',
+  'Je n’ai jamais gardé un message sans le lire pour gagner du temps.',
+  'Je n’ai jamais changé d’avis juste pour éviter un conflit.',
+  'Je n’ai jamais pleuré à cause d’une chanson en public.',
+  'Je n’ai jamais menti sur l’heure à laquelle je me suis couché·e.',
+  'Je n’ai jamais fait une capture d’écran d’une de nos conversations.',
+  'Je n’ai jamais espéré un message toute une soirée.',
+  'Je n’ai jamais mangé quelque chose de périmé en connaissance de cause.',
+  'Je n’ai jamais fait semblant d’avoir un appel pour partir.',
+  'Je n’ai jamais rêvé de quelqu’un puis évité de lui en parler.'
+];
+
+/* --- Qui est le plus susceptible de… --- */
+DATA.likely = [
+  'oublier notre anniversaire ?',
+  'pleurer devant une pub émouvante ?',
+  'devenir riche par accident ?',
+  'répondre à un message trois jours plus tard ?',
+  'perdre ses clés dans la même semaine deux fois ?',
+  'commander le même plat toute sa vie ?',
+  'dire « on part demain » et le faire vraiment ?',
+  'parler à un inconnu dans le train ?',
+  'craquer et acheter un animal sur un coup de tête ?',
+  'gagner un concours de karaoké ?',
+  'se perdre dans une ville qu’il connaît ?',
+  'garder rancune pour une bêtise ?',
+  'survivre le plus longtemps sans téléphone ?',
+  'faire semblant de comprendre une explication technique ?',
+  'devenir célèbre sur internet sans le vouloir ?',
+  'oublier de manger parce qu’il est absorbé par autre chose ?',
+  'être en retard à son propre mariage ?',
+  'pardonner en premier après une dispute ?',
+  'lancer une conversation sérieuse à 2 h du matin ?',
+  'apprendre une langue entière juste pour voyager ?',
+  'passer une journée entière au lit sans culpabiliser ?',
+  'faire un discours improvisé devant 200 personnes ?',
+  'oublier où il a garé la voiture ?',
+  'adopter cinq chats ?',
+  'pleurer en écoutant une vieille chanson ?',
+  'organiser un voyage surprise ?',
+  'perdre son sang-froid dans une file d’attente ?',
+  'dire oui à un défi ridicule ?',
+  'écrire un livre un jour ?',
+  'préparer un repas à trois heures du matin ?',
+  'rater son réveil un jour important ?',
+  'faire ami-ami avec le serveur d’un restaurant ?',
+  'garder tous les tickets et souvenirs de nos sorties ?',
+  'se disputer avec un GPS ?',
+  'accepter de déménager à l’autre bout du monde ?',
+  'craquer devant un bébé animal ?',
+  'oublier son propre code de carte bancaire ?',
+  'pleurer de rire jusqu’à ne plus respirer ?',
+  'faire une déclaration en public ?',
+  'garder le silence trop longtemps au lieu de parler ?',
+  'renverser son café sur son clavier ?',
+  'retenir toutes les répliques d’un film par cœur ?',
+  'planifier des vacances un an à l’avance ?',
+  'parler à ses plantes ?',
+  'refaire trois fois le même trajet parce qu’il a oublié quelque chose ?',
+  'écrire un message de trois pages à 1 h du matin ?',
+  'devenir accro à un jeu idiot ?',
+  'préférer marcher deux heures plutôt que prendre le bus ?',
+  'rire nerveusement dans un moment sérieux ?',
+  'garder un secret jusqu’au bout, quoi qu’il arrive ?'
+];
+
+/* --- Duel de compatibilité (QCM) --- */
+DATA.compat = [
+  {q:'Un dimanche parfait, c’est…', o:['Au lit, rideaux fermés','Une longue balade','Cuisiner à deux','Sortir voir du monde']},
+  {q:'Notre voyage idéal ?', o:['Une île déserte','Une grande ville','La montagne','Un road trip']},
+  {q:'La pire dispute vient…', o:['Du silence','Du ton employé','De la jalousie','Des détails du quotidien']},
+  {q:'Preuve d’amour préférée ?', o:['Les mots','Le temps passé','Les gestes','Le contact physique']},
+  {q:'On se retrouve après longtemps : premier réflexe ?', o:['Un long câlin','Parler sans arrêt','Manger ensemble','Ne rien dire, juste être là']},
+  {q:'Le plus important dans un couple ?', o:['La confiance','L’humour','Le désir','La liberté']},
+  {q:'Ta façon de gérer le stress ?', o:['J’en parle','Je m’isole','Je m’active','Je dors']},
+  {q:'Notre soirée type ?', o:['Film et couverture','Jeux','Longue discussion','Chacun son truc, ensemble']},
+  {q:'Ce qui manque le plus à distance ?', o:['Le contact','La routine partagée','Les silences confortables','Les surprises']},
+  {q:'Le meilleur moment de la journée ?', o:['Le matin tôt','L’après-midi','Le coucher du soleil','La nuit']},
+  {q:'Si on avait un animal ?', o:['Un chien','Un chat','Quelque chose d’exotique','Aucun, on voyage']},
+  {q:'On gagne 10 000 € demain :', o:['On voyage','On économise','On fait une folie','On aide quelqu’un']},
+  {q:'Ce qui te séduit le plus :', o:['L’intelligence','La gentillesse','L’humour','La confiance en soi']},
+  {q:'Notre chanson serait plutôt…', o:['Une ballade','Un morceau qui fait danser','Un vieux classique','Un truc que personne ne connaît']},
+  {q:'Le repas de nos retrouvailles ?', o:['Fait maison','Un grand restaurant','Street food','Petit déjeuner à 22 h']},
+  {q:'Tu préfères recevoir…', o:['Une lettre écrite à la main','Un cadeau surprise','Un appel de deux heures','Une visite non annoncée']},
+  {q:'La qualité que tu m’envies :', o:['Ma patience','Mon audace','Mon organisation','Ma spontanéité']},
+  {q:'Notre appartement idéal :', o:['Lumineux et minimaliste','Chaleureux et encombré','Grand et moderne','Petit mais bien placé']},
+  {q:'Face à un problème, tu veux :', o:['Des solutions','Du réconfort','Du silence','De la distraction']},
+  {q:'La saison de notre histoire :', o:['Printemps','Été','Automne','Hiver']},
+  {q:'On se dispute : qui cède en premier ?', o:['Moi','Toi','Personne','Les deux en même temps']},
+  {q:'Le luxe ultime :', o:['Du temps','De l’espace','Du calme','Des expériences']},
+  {q:'Tu es plutôt :', o:['Plan détaillé','Improvisation totale','Un peu des deux','Ça dépend de mon humeur']},
+  {q:'Ce qui te rassure le plus :', o:['Un message du matin','Un appel imprévu','Une photo du quotidien','Savoir que je pense à toi']},
+  {q:'Notre film commun :', o:['Une comédie romantique','Un thriller','Un film d’animation','Un documentaire']},
+  {q:'La chose que tu changerais chez toi :', o:['Mon impatience','Mes doutes','Mon caractère','Rien du tout']},
+  {q:'Le plus beau mot :', o:['Toujours','Enfin','Ensemble','Peut-être']},
+  {q:'Tu gardes les souvenirs :', o:['En photos','Dans ta tête','En objets','En écrivant']},
+  {q:'La distance, c’est :', o:['Une épreuve','Une preuve','Un détail','Une torture douce']},
+  {q:'Ce dont tu as le plus besoin ce soir :', o:['Rire','Être écouté·e','Être rassuré·e','Ne penser à rien']},
+  {q:'La façon de se réveiller idéale :', o:['Doucement, sans réveil','Café tout de suite','Musique à fond','Un message de toi']},
+  {q:'Ce qu’on garderait de nos débuts :', o:['L’excitation','La découverte','Les longues nuits','La maladresse']},
+  {q:'Notre rituel préféré :', o:['Le message du soir','L’appel du dimanche','Les photos du quotidien','Les blagues privées']},
+  {q:'Le pire scénario :', o:['L’indifférence','La routine','Le mensonge','La distance']},
+  {q:'Tu préfères que je sois :', o:['Honnête, même si ça pique','Doux·ce, même si ça arrondit','Drôle en toutes circonstances','Présent·e, tout simplement']},
+  {q:'Un samedi soir sans plan :', o:['On improvise dehors','On commande et on reste','On appelle des amis','On dort tôt']},
+  {q:'Le cadeau qui te toucherait le plus :', o:['Fait à la main','Très cher','Une expérience','Un objet plein de souvenirs']},
+  {q:'Quand je te manque, tu :', o:['Le dis tout de suite','Attends que ça passe','Envoies un signe indirect','Occupes-toi ailleurs']},
+  {q:'Notre plus grande force :', o:['On se parle vraiment','On rit de tout','On se fait confiance','On tient dans la durée']},
+  {q:'Dans dix ans, on sera :', o:['Au même endroit','Ailleurs, ensemble','Encore en train de jouer à ça','Bien plus solides']}
+];
+
+/* Emojis pour le memory */
+const MEM_ICONS = ['💖','🌙','⭐','🔥','🌸','🎧','☕','🦋'];
+const AVATARS = ['🦊','🐼','🦉','🐙','🦄','🐝','🐺','🦩','🐳','🦚'];
+const EMOTES = ['❤️','😂','😍','🔥','😮','👏','🙈','😭','🥺','💯','🎉','🫶'];
+
+/* ==========================================================
+   AVERI — 2. OUTILS & EFFETS
+   ========================================================== */
+const $ = (id) => document.getElementById(id);
+const el = (t, c, txt) => { const n = document.createElement(t); if (c) n.className = c; if (txt != null) n.textContent = txt; return n; };
+const rnd = (a) => a[Math.floor(Math.random() * a.length)];
+const esc = (s) => String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+function toast(msg, kind) {
+  const t = el('div', 'toast' + (kind ? ' ' + kind : ''), msg);
+  $('toasts').appendChild(t);
+  setTimeout(() => t.remove(), 3600);
+}
+
+/* --- Confettis / cœurs --- */
+const fx = $('fx'), fxc = fx.getContext('2d');
+let parts = [], fxRunning = false;
+function sizeFx() { fx.width = innerWidth * devicePixelRatio; fx.height = innerHeight * devicePixelRatio; fxc.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
+addEventListener('resize', sizeFx); sizeFx();
+
+function burst(kind = 'confetti', n = 70) {
+  const colors = ['#ff5d8f','#ffb457','#9b6cff','#5fe1ff','#4ade80','#ffffff'];
+  for (let i = 0; i < n; i++) {
+    parts.push({
+      x: innerWidth / 2 + (Math.random() - .5) * innerWidth * .5,
+      y: innerHeight * .35 + (Math.random() - .5) * 60,
+      vx: (Math.random() - .5) * 9, vy: -Math.random() * 11 - 3,
+      g: .28 + Math.random() * .18, r: 4 + Math.random() * 6,
+      rot: Math.random() * 6.28, vr: (Math.random() - .5) * .3,
+      c: colors[i % colors.length], life: 110 + Math.random() * 60,
+      heart: kind === 'hearts'
+    });
+  }
+  if (!fxRunning) { fxRunning = true; requestAnimationFrame(stepFx); }
+}
+function stepFx() {
+  fxc.clearRect(0, 0, innerWidth, innerHeight);
+  parts = parts.filter(p => p.life-- > 0 && p.y < innerHeight + 60);
+  for (const p of parts) {
+    p.x += p.vx; p.y += p.vy; p.vy += p.g; p.vx *= .995; p.rot += p.vr;
+    fxc.save(); fxc.translate(p.x, p.y); fxc.rotate(p.rot);
+    fxc.globalAlpha = Math.max(0, Math.min(1, p.life / 60));
+    fxc.fillStyle = p.c;
+    if (p.heart) {
+      fxc.font = p.r * 3 + 'px serif'; fxc.textAlign = 'center'; fxc.fillText('❤', 0, 0);
+    } else {
+      fxc.fillRect(-p.r / 2, -p.r / 2, p.r, p.r * 1.6);
     }
+    fxc.restore();
+  }
+  if (parts.length) requestAnimationFrame(stepFx);
+  else { fxRunning = false; fxc.clearRect(0, 0, innerWidth, innerHeight); }
+}
 
-    function sendMessage(text) {
-        if (!connection || connection.open === false) {
-            addMessage('❌ Pas de connexion active.', 'system');
-            return;
+/* --- Emote volante --- */
+function flyEmote(e, fromOther) {
+  const n = el('div', 'flying', e);
+  n.style.left = (fromOther ? 25 : 65) + Math.random() * 10 + '%';
+  n.style.bottom = '120px';
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 2500);
+}
+
+/* --- Son discret (WebAudio, sans fichier) --- */
+let actx = null;
+function beep(freq = 620, dur = .08, type = 'sine', vol = .05) {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq; g.gain.value = vol;
+    o.connect(g); g.connect(actx.destination); o.start();
+    g.gain.exponentialRampToValueAtTime(.0001, actx.currentTime + dur);
+    o.stop(actx.currentTime + dur + .02);
+  } catch (e) {}
+}
+
+/* ==========================================================
+   AVERI — 3. ÉTAT GLOBAL
+   ========================================================== */
+let peer = null, conn = null, pingTimer = null, joinTimer = null;
+let ME = { name: 'Moi', avatar: AVATARS[0], role: 'host' };
+let YOU = { name: null, avatar: '👤' };
+let room = '';
+let unread = 0, chatOpen = false;
+let lastSpinSeen = 0, lastSig = '';
+
+const GAMES = [
+  { id:'truth',  name:'Action ou Vérité', desc:'La roue décide. Tu assumes.',        icon:'#ic-dice',   tag:'Duel' },
+  { id:'never',  name:'Je n’ai jamais',   desc:'Avoue en même temps que moi.',        icon:'#ic-hand',   tag:'Aveux' },
+  { id:'likely', name:'Le plus susceptible', desc:'Toi ou moi ? On vote en secret.',  icon:'#ic-vote',   tag:'Vote' },
+  { id:'compat', name:'Compatibilité',    desc:'Même réponse = points d’harmonie.',   icon:'#ic-heart',  tag:'Duo' },
+  { id:'c4',     name:'Puissance 4',      desc:'Aligne quatre cœurs avant l’autre.',  icon:'#ic-grid',   tag:'Stratégie' },
+  { id:'memory', name:'Memory du duo',    desc:'Retrouve les paires, tour par tour.', icon:'#ic-cards',  tag:'Mémoire' }
+];
+
+function freshState() {
+  return {
+    mode: null, turn: 'host', round: 0,
+    scores: { host: 0, guest: 0 },
+    agree: { ok: 0, total: 0 },
+    card: null, spin: 0, wheelKind: null,
+    answers: { host: null, guest: null }, revealed: false,
+    board: null, winLine: null, winner: null,
+    mem: null, memLock: false
+  };
+}
+let G = freshState();
+
+const isHost = () => ME.role === 'host';
+const other = (r) => r === 'host' ? 'guest' : 'host';
+const myRole = () => ME.role;
+const isMyTurn = () => G.turn === myRole();
+const nameOf = (r) => r === myRole() ? (ME.name || 'Moi') : (YOU.name || 'L’autre');
+
+/* ==========================================================
+   AVERI — 4. RÉSEAU (PeerJS, pair-à-pair)
+   ========================================================== */
+const ICE = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' }
+  ]
+};
+
+function setStatus(txt, cls) { const s = $('status'); s.textContent = txt; s.className = 'status' + (cls ? ' ' + cls : ''); }
+function setConn(txt, cls) { const b = $('connBadge'); if (b) { b.textContent = txt; b.className = 'turnpill' + (cls ? ' ' + cls : ''); } }
+
+function send(obj) { try { if (conn && conn.open) conn.send(obj); } catch (e) { console.warn('send', e); } }
+
+function cleanup() {
+  clearInterval(pingTimer); clearTimeout(joinTimer);
+  if (conn) { try { conn.close(); } catch (e) {} conn = null; }
+  if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+}
+
+function slug(s) { return s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'salle'; }
+
+function start(asHost, targetOverride) {
+  const name = $('nameInput').value.trim().slice(0, 16);
+  if (!name) { toast('Écris ton prénom d’abord', 'bad'); $('nameInput').focus(); return; }
+  const code = $('roomInput').value.trim();
+  if (!code && !targetOverride) { toast('Il faut un code de salle', 'bad'); $('roomInput').focus(); return; }
+
+  cleanup();
+  ME.name = name; ME.role = asHost ? 'host' : 'guest';
+  room = slug(code);
+  const myId = targetOverride ? ('averi-' + Math.random().toString(36).slice(2, 9))
+                              : (asHost ? `averi-${room}-h` : `averi-${room}-g`);
+  const target = targetOverride || (asHost ? null : `averi-${room}-h`);
+
+  $('createBtn').disabled = $('joinBtn').disabled = $('manualConnectBtn').disabled = true;
+  setStatus('🔄 Ouverture du canal sécurisé…', 'warn');
+
+  peer = new Peer(myId, { debug: 0, config: ICE });
+
+  peer.on('open', (id) => {
+    $('myPeerId').textContent = id;
+    $('idbox').classList.remove('hidden');
+    setStatus(asHost ? '🟢 Salle ouverte — en attente de l’autre…' : '🔄 Recherche de l’hôte…', asHost ? 'online' : 'warn');
+
+    if (asHost && !targetOverride) {
+      peer.on('connection', (c) => {
+        if (conn && conn.open) { try { c.close(); } catch (e) {} return; }
+        conn = c; wireConn(c);
+      });
+    } else {
+      const c = peer.connect(target, { reliable: true, serialization: 'json' });
+      conn = c; wireConn(c);
+      joinTimer = setTimeout(() => {
+        if (!conn || !conn.open) {
+          setStatus('⏰ Personne à « ' + target +' ». L’hôte a-t-il créé la salle ?', 'err');
+          $('createBtn').disabled = $('joinBtn').disabled = $('manualConnectBtn').disabled = false;
         }
-        const payload = { from: myName, text: text };
-        connection.send(payload);
-        addMessage(`${myName} : ${text}`, 'me');
-        chatInput.value = '';
+      }, 14000);
+    }
+  });
+
+  peer.on('error', (err) => {
+    let m;
+    switch (err.type) {
+      case 'unavailable-id': m = 'Ce code de salle est déjà pris. Change-le (ou clique 🎲).'; break;
+      case 'peer-unavailable': m = 'Aucune salle « ' + room + ' » ouverte. L’hôte doit la créer avant.'; break;
+      case 'network': m = 'Réseau instable. Vérifie ta connexion.'; break;
+      case 'browser-incompatible': m = 'Navigateur trop ancien pour le WebRTC.'; break;
+      case 'server-error': m = 'Le service de mise en relation ne répond pas. Réessaie dans un instant.'; break;
+      default: m = err.message || err.type;
+    }
+    setStatus('❌ ' + m, 'err');
+    $('createBtn').disabled = $('joinBtn').disabled = $('manualConnectBtn').disabled = false;
+  });
+}
+
+function wireConn(c) {
+  c.on('open', () => {
+    clearTimeout(joinTimer);
+    setStatus('🟢 Connecté en direct', 'ok');
+    enterGame();
+    send({ t: 'hello', name: ME.name, avatar: ME.avatar, role: ME.role });
+    if (isHost()) { G = freshState(); broadcast(); }
+    beep(680, .1); beep(880, .12);
+    burst('hearts', 40);
+    clearInterval(pingTimer);
+    pingTimer = setInterval(() => send({ t: 'ping' }), 20000);
+  });
+
+  c.on('data', onData);
+
+  c.on('close', () => {
+    setConn('🔴 Lien coupé', 'err');
+    sysMsg('La connexion a été interrompue.');
+    toast('Déconnexion', 'bad');
+    clearInterval(pingTimer);
+  });
+
+  c.on('error', (e) => { sysMsg('Erreur de liaison : ' + (e.message || e.type)); });
+}
+
+function onData(d) {
+  if (!d || typeof d !== 'object') return;
+  switch (d.t) {
+    case 'ping': return;
+    case 'hello':
+      YOU.name = String(d.name || 'L’autre').slice(0, 16);
+      YOU.avatar = d.avatar || '👤';
+      $('nameYou').textContent = YOU.name;
+      $('faceYou').textContent = YOU.avatar;
+      setConn('🟢 ' + YOU.name + ' est là', 'mine');
+      sysMsg(YOU.name + ' a rejoint la partie.');
+      toast(YOU.avatar + ' ' + YOU.name + ' est connecté·e', 'good');
+      if (isHost()) broadcast(); else { lastSig = ''; render(); }
+      break;
+    case 'chat':
+      pushMsg(String(d.text).slice(0, 300), 'you');
+      if (!chatOpen) { unread++; updateBadge(); }
+      beep(520, .05);
+      break;
+    case 'emote':
+      flyEmote(String(d.e).slice(0, 4), true);
+      beep(760, .06, 'triangle');
+      break;
+    case 'act':
+      if (isHost()) applyAction('guest', d.a);
+      break;
+    case 'state':
+      if (!isHost()) { G = d.s; render(); }
+      break;
+    case 'bye':
+      sysMsg((YOU.name || 'L’autre') + ' a quitté la partie.');
+      setConn('🔴 Parti·e', 'err');
+      break;
+  }
+}
+
+function broadcast() { send({ t: 'state', s: G }); render(); }
+
+/* Toute action passe par l’hôte : source unique de vérité. */
+function act(a) {
+  if (isHost()) applyAction('host', a);
+  else send({ t: 'act', a });
+}
+
+/* ==========================================================
+   AVERI — 5. MOTEUR DE JEU (autorité : l’hôte)
+   ========================================================== */
+const POOLS = {};
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function pick(key, list) {
+  if (!POOLS[key] || !POOLS[key].length) POOLS[key] = shuffle(list.slice());
+  return POOLS[key].pop();
+}
+
+const KINDS = { truth: 'Vérité', dare: 'Action', deep: 'Profond' };
+const WHEEL = ['truth', 'dare', 'deep', 'truth', 'dare', 'deep'];
+
+function dealCard() {
+  G.answers = { host: null, guest: null };
+  G.revealed = false;
+  switch (G.mode) {
+    case 'never':  G.card = { kind: 'never',  text: pick('never', DATA.never) }; break;
+    case 'likely': G.card = { kind: 'likely', text: pick('likely', DATA.likely) }; break;
+    case 'compat': { const c = pick('compat', DATA.compat); G.card = { kind: 'compat', text: c.q, opts: c.o }; break; }
+    case 'truth':  G.card = { kind: G.wheelKind, text: pick(G.wheelKind, DATA[G.wheelKind]) }; break;
+  }
+}
+
+function setMode(m) {
+  G.mode = m; G.card = null; G.revealed = false; G.winner = null; G.winLine = null;
+  G.answers = { host: null, guest: null }; G.memLock = false;
+  if (m === 'c4') { G.board = Array(42).fill(null); G.turn = 'host'; }
+  else if (m === 'memory') {
+    const deck = shuffle(MEM_ICONS.concat(MEM_ICONS));
+    G.mem = { deck, done: Array(16).fill(false), up: [] };
+    G.turn = 'host';
+  } else if (m !== 'truth') dealCard();
+}
+
+function bothAnswered() { return G.answers.host !== null && G.answers.guest !== null; }
+
+function scoreAgreement(pts) {
+  G.agree.total++;
+  const ok = G.answers.host === G.answers.guest;
+  if (ok) { G.agree.ok++; G.scores.host += pts; G.scores.guest += pts; }
+  return ok;
+}
+
+function applyAction(who, a) {
+  if (!isHost() || !a) return;
+  switch (a.type) {
+    case 'menu':
+      G.mode = null; G.card = null; G.revealed = false;
+      G.answers = { host: null, guest: null };
+      break;
+
+    case 'setMode':
+      if (GAMES.some(g => g.id === a.mode)) setMode(a.mode);
+      break;
+
+    case 'spin':
+      if (G.mode !== 'truth' || G.turn !== who || G.card) return;
+      G.wheelKind = rnd(WHEEL);
+      G.spin = (G.spin || 0) + 1;
+      dealCard();
+      break;
+
+    case 'resolve': {
+      if (G.mode !== 'truth' || G.turn !== who || !G.card) return;
+      if (a.done) G.scores[who] += 3;
+      else { G.scores[who] = Math.max(0, G.scores[who] - 1); G.scores[other(who)] += 1; }
+      G.card = null; G.wheelKind = null; G.turn = other(who); G.round++;
+      break;
     }
 
-    function copyPeerId() {
-        const id = myPeerIdSpan.textContent;
-        if (navigator.clipboard) {
-            navigator.clipboard.writeText(id).then(() => {
-                addMessage('✅ ID copié !', 'system');
-            });
+    case 'answer': {
+      if (!G.card || G.revealed || G.answers[who] !== null) return;
+      G.answers[who] = a.v;
+      if (bothAnswered()) {
+        G.revealed = true; G.round++;
+        scoreAgreement(G.mode === 'never' ? 1 : 2);
+      }
+      break;
+    }
+
+    case 'next':
+      if (!G.revealed) return;
+      dealCard();
+      break;
+
+    case 'drop': {
+      if (G.mode !== 'c4' || G.turn !== who || G.winner) return;
+      const col = a.col | 0;
+      if (col < 0 || col > 6) return;
+      let row = -1;
+      for (let r = 5; r >= 0; r--) if (!G.board[r * 7 + col]) { row = r; break; }
+      if (row < 0) return;
+      G.board[row * 7 + col] = who;
+      const line = c4Win(G.board, row, col, who);
+      if (line) { G.winner = who; G.winLine = line; G.scores[who] += 5; }
+      else if (G.board.every(Boolean)) { G.winner = 'draw'; }
+      else G.turn = other(who);
+      break;
+    }
+
+    case 'reset':
+      if (G.mode === 'c4') { G.board = Array(42).fill(null); G.winner = null; G.winLine = null; G.turn = other(G.turn); }
+      else if (G.mode === 'memory') setMode('memory');
+      break;
+
+    case 'flip': {
+      if (G.mode !== 'memory' || G.turn !== who || G.memLock) return;
+      const i = a.i | 0, M = G.mem;
+      if (i < 0 || i > 15 || M.done[i] || M.up.includes(i)) return;
+      M.up.push(i);
+      if (M.up.length === 2) {
+        const [x, y] = M.up;
+        if (M.deck[x] === M.deck[y]) {
+          M.done[x] = M.done[y] = true; M.up = []; G.scores[who] += 1;
+          if (M.done.every(Boolean)) G.winner = G.scores.host === G.scores.guest ? 'draw'
+            : (G.scores.host > G.scores.guest ? 'host' : 'guest');
         } else {
-            // Fallback
-            const range = document.createRange();
-            range.selectNode(myPeerIdSpan);
-            window.getSelection().removeAllRanges();
-            window.getSelection().addRange(range);
-            document.execCommand('copy');
-            addMessage('✅ ID copié !', 'system');
+          G.memLock = true;
+          setTimeout(() => { G.mem.up = []; G.memLock = false; G.turn = other(who); broadcast(); }, 1150);
         }
+      }
+      break;
     }
+  }
+  broadcast();
+}
 
-    // ============================================================
-    // 4. NETTOYAGE
-    // ============================================================
-    function cleanup() {
-        if (connection) {
-            try { 
-                connection.removeAllListeners();
-                connection.close(); 
-            } catch(e) {}
-            connection = null;
-        }
-        if (peer) {
-            try { 
-                peer.removeAllListeners();
-                peer.destroy(); 
-            } catch(e) {}
-            peer = null;
-        }
+function c4Win(b, row, col, who) {
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+  for (const [dr, dc] of dirs) {
+    const line = [row * 7 + col];
+    for (const s of [1, -1]) {
+      let r = row + dr * s, c = col + dc * s;
+      while (r >= 0 && r < 6 && c >= 0 && c < 7 && b[r * 7 + c] === who) { line.push(r * 7 + c); r += dr * s; c += dc * s; }
     }
+    if (line.length >= 4) return line;
+  }
+  return null;
+}
 
-    // ============================================================
-    // 5. CONNEXION PEERJS - VERSION AMÉLIORÉE
-    // ============================================================
-    function connectPeer(roomName, name, creator, targetId = null) {
-        cleanup();
-        myName = name.trim() || (creator ? 'Hôte' : 'Invité');
-        isCreator = creator;
-        room = roomName.trim().toLowerCase().replace(/\s+/g, '-');
+/* ==========================================================
+   AVERI — 6. RENDU
+   ========================================================== */
+let spinAnimating = false, spinTimer = null;
 
-        // IDs fixes et prévisibles
-        const hostId = `${room}-host`;
-        const guestId = `${room}-guest`;
-        const myId = creator ? hostId : guestId;
-        const peerToConnect = targetId || (creator ? null : hostId);
+function render() {
+  /* --- HUD --- */
+  $('nameMe').textContent = ME.name || 'Moi';
+  $('faceMe').textContent = ME.avatar;
+  $('nameYou').textContent = YOU.name || 'En attente…';
+  $('faceYou').textContent = YOU.avatar;
+  $('scoreMe').textContent = G.scores[myRole()] + ' pt' + (G.scores[myRole()] > 1 ? 's' : '');
+  $('scoreYou').textContent = G.scores[other(myRole())] + ' pt' + (G.scores[other(myRole())] > 1 ? 's' : '');
+  $('pcardMe').classList.toggle('active', G.mode && isMyTurn() && turnBased());
+  $('pcardYou').classList.toggle('active', G.mode && !isMyTurn() && turnBased());
 
-        // Désactiver les boutons
-        createBtn.disabled = true;
-        joinBtn.disabled = true;
-        manualConnectBtn.disabled = true;
+  const pct = G.agree.total ? Math.round(G.agree.ok / G.agree.total * 100) : 0;
+  $('harmonyBar').style.width = (G.agree.total ? pct : 0) + '%';
+  $('harmonyVal').textContent = G.agree.total ? pct + '% · ' + G.agree.ok + '/' + G.agree.total : 'à découvrir';
 
-        statusDiv.textContent = `🔄 Connexion à PeerJS... (${myId})`;
-        statusDiv.className = 'status';
+  /* --- Menu ou plateau --- */
+  const menu = $('gameMenu'), stage = $('gameStage');
+  if (!G.mode) { menu.classList.remove('hidden'); stage.classList.add('hidden'); lastSig = ''; return; }
+  menu.classList.add('hidden'); stage.classList.remove('hidden');
 
-        // Options de configuration robustes
-        const peerOptions = {
-            debug: 0,
-            config: {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
-                    { urls: 'stun:stun3.l.google.com:19302' },
-                    // Serveurs TURN de secours (plus fiables)
-                    {
-                        urls: 'turn:openrelay.metered.ca:443',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    },
-                    {
-                        urls: 'turn:openrelay.metered.ca:80',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    }
-                ]
-            }
-        };
-
-        peer = new Peer(myId, peerOptions);
-
-        // ---- Gestion des événements ----
-        peer.on('open', (id) => {
-            statusDiv.textContent = `✅ Connecté (ID: ${id})`;
-            statusDiv.className = 'status online';
-            document.getElementById('connectionZone').style.display = 'none';
-            gameZone.classList.remove('hidden');
-            gameStatus.textContent = creator ? `🟡 En attente de l'autre...` : `🟡 Connexion à ${peerToConnect}...`;
-            gameStatus.className = 'status';
-
-            // Afficher l'ID
-            myPeerIdSpan.textContent = id;
-            infoBox.classList.remove('hidden');
-            manualPeerId.value = id;
-
-            if (creator) {
-                // L'hôte écoute les connexions
-                addMessage(`🔍 Salle "${room}" créée.`, 'system');
-                addMessage(`📋 Donne ton ID à l'autre : ${id}`, 'system');
-                
-                peer.on('connection', (conn) => {
-                    if (connection && connection.open) {
-                        conn.close();
-                        addMessage('⚠️ Quelqu\'un a essayé de se connecter mais vous êtes déjà en couple.', 'system');
-                        return;
-                    }
-                    connection = conn;
-                    setupConnection(conn);
-                });
-            } else {
-                // L'invité se connecte
-                if (peerToConnect) {
-                    addMessage(`🔗 Connexion à "${peerToConnect}"...`, 'system');
-                    const conn = peer.connect(peerToConnect, { reliable: true });
-                    connection = conn;
-                    setupConnection(conn);
-
-                    // Timeout plus long
-                    let timeoutId = setTimeout(() => {
-                        if (connection && !connection.open) {
-                            gameStatus.textContent = '⏰ Délai dépassé';
-                            gameStatus.className = 'status error';
-                            addMessage(`❌ Impossible de joindre "${peerToConnect}".`, 'system');
-                            addMessage(`💡 Vérifie que l'hôte a bien créé la salle et utilise le bon ID.`, 'system');
-                            addMessage(`💡 Essaie le bouton "Connexion directe" avec l'ID affiché par l'hôte.`, 'system');
-                        }
-                    }, 15000);
-
-                    // Annuler le timeout si la connexion s'établit
-                    const origSetup = setupConnection;
-                    const wrappedSetup = function(conn) {
-                        clearTimeout(timeoutId);
-                        origSetup(conn);
-                    };
-                    // On remplace la fonction de callback
-                    // (on utilise une approche différente plus bas)
-                }
-            }
-        });
-
-        peer.on('error', (err) => {
-            console.error('PeerJS Error:', err);
-            let msg = '❌ Erreur : ';
-            if (err.type === 'unavailable-id') {
-                msg += `Le code "${room}" est déjà utilisé. Change le code.`;
-            } else if (err.type === 'peer-unavailable') {
-                msg += `L'hôte "${peerToConnect}" n'existe pas.`;
-            } else if (err.type === 'network') {
-                msg += `Problème réseau. Vérifie ta connexion Internet.`;
-            } else if (err.type === 'browser-incompatible') {
-                msg += `Navigateur incompatible. Utilise Chrome ou Edge.`;
-            } else {
-                msg += err.message || err.type;
-            }
-            statusDiv.textContent = msg;
-            statusDiv.className = 'status error';
-            if (gameStatus) {
-                gameStatus.textContent = '❌ Erreur';
-                gameStatus.className = 'status error';
-            }
-            addMessage(msg, 'system');
-            
-            // Réessayer automatiquement pour certaines erreurs
-            if (err.type === 'network' && reconnectAttempts < MAX_RECONNECT) {
-                reconnectAttempts++;
-                addMessage(`🔄 Tentative de reconnexion (${reconnectAttempts}/${MAX_RECONNECT})...`, 'system');
-                setTimeout(() => {
-                    if (peer && !peer.destroyed) {
-                        // Réessayer
-                    }
-                }, 3000);
-            } else {
-                setTimeout(() => resetUI(), 4000);
-            }
-        });
-
-        // Nettoyage
-        window.addEventListener('beforeunload', () => cleanup());
+  /* Animation de la roue : on retarde la carte le temps du tour de roue */
+  if (G.mode === 'truth') {
+    if ((G.spin || 0) !== lastSpinSeen && G.card && !spinAnimating) {
+      spinAnimating = true; lastSig = '';
+      clearTimeout(spinTimer);
+      spinTimer = setTimeout(() => {
+        lastSpinSeen = G.spin || 0; spinAnimating = false; lastSig = '';
+        beep(920, .12); render();
+      }, 4300);
     }
+  } else { lastSpinSeen = G.spin || 0; spinAnimating = false; }
 
-    // ============================================================
-    // 6. GESTION DE LA CONNEXION ÉTABLIE
-    // ============================================================
-    function setupConnection(conn) {
-        conn.on('open', () => {
-            gameStatus.textContent = `🟢 Connecté(e) ! 🎉`;
-            gameStatus.className = 'status connected';
-            addMessage(`🔗 Connexion établie avec succès !`, 'system');
-            addMessage(`💬 Vous pouvez maintenant échanger des défis et des questions.`, 'system');
-            // Envoyer un message de bienvenue
-            conn.send({ from: myName, text: `👋 ${myName} est connecté !` });
-            reconnectAttempts = 0;
-        });
+  const g = GAMES.find(x => x.id === G.mode);
+  $('stageTitle').textContent = g.name;
+  $('stageIcon').innerHTML = '<use href="' + g.icon + '"/>';
 
-        conn.on('data', (data) => {
-            if (data && data.text) {
-                const from = data.from || 'L\'autre';
-                addMessage(`${from} : ${data.text}`, 'other');
-            }
-        });
+  const pill = $('turnPill');
+  if (turnBased()) {
+    pill.textContent = isMyTurn() ? '🎯 À toi de jouer' : '⏳ Tour de ' + (YOU.name || 'l’autre');
+    pill.className = 'turnpill' + (isMyTurn() ? ' mine' : '');
+  } else {
+    pill.textContent = G.revealed ? '👀 Révélation' : '🤫 Réponse secrète';
+    pill.className = 'turnpill';
+  }
 
-        conn.on('close', () => {
-            gameStatus.textContent = '🔴 Déconnecté';
-            gameStatus.className = 'status error';
-            addMessage('❌ L\'autre s\'est déconnecté.', 'system');
-            addMessage('💡 Utilise "Rejoindre" avec le même code pour te reconnecter.', 'system');
-            setTimeout(() => resetUI(), 5000);
-        });
+  /* Signature : on ne reconstruit que si l’état visible a changé */
+  const sig = JSON.stringify([G, ME.role, YOU.name, spinAnimating]);
+  if (sig === lastSig) return;
+  lastSig = sig;
 
-        conn.on('error', (err) => {
-            console.error('Connection error:', err);
-            addMessage(`⚠️ Erreur de connexion: ${err.message || err.type}`, 'system');
-        });
+  const body = $('stageBody');
+  body.innerHTML = '';
+  ({ truth: viewTruth, never: viewAnswer, likely: viewAnswer, compat: viewAnswer, c4: viewC4, memory: viewMemory })[G.mode](body);
+}
 
-        // Ping pour maintenir la connexion active
-        let pingInterval = setInterval(() => {
-            if (conn && conn.open) {
-                try {
-                    conn.send({ ping: true });
-                } catch(e) {
-                    clearInterval(pingInterval);
-                }
-            } else {
-                clearInterval(pingInterval);
-            }
-        }, 30000);
+function turnBased() { return G.mode === 'truth' || G.mode === 'c4' || G.mode === 'memory'; }
 
-        // Nettoyer l'intervalle à la fermeture
-        conn.on('close', () => clearInterval(pingInterval));
+function card(kindClass, cat, text, icon) {
+  const d = el('div', 'qcard ' + kindClass);
+  const w = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  w.setAttribute('class', 'watermark'); w.setAttribute('viewBox', '0 0 100 100');
+  w.innerHTML = '<use href="' + icon + '"/>';
+  d.appendChild(w);
+  d.appendChild(el('div', 'cat', cat));
+  d.appendChild(el('div', 'txt', text));
+  return d;
+}
+function waiting(txt) {
+  const w = el('div', 'waiting');
+  w.appendChild(el('span', null, txt));
+  const d = el('span', 'dots'); d.innerHTML = '<i></i><i></i><i></i>';
+  w.appendChild(d);
+  return w;
+}
+function btn(label, cls, fn) { const b = el('button', 'btn ' + (cls || ''), label); b.onclick = fn; return b; }
+
+/* --- Roue --- */
+function buildWheel() {
+  const wrap = el('div', 'wheelwrap');
+  const needle = el('div', 'needle', '▼');
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.id = 'wheel'; svg.setAttribute('viewBox', '0 0 200 200');
+  const cols = { truth: '#5fe1ff', dare: '#ff5d8f', deep: '#9b6cff' };
+  let inner = '<circle cx="100" cy="100" r="97" fill="rgba(0,0,0,.5)"/>';
+  WHEEL.forEach((k, i) => {
+    const a0 = (i * 60 - 90) * Math.PI / 180, a1 = ((i + 1) * 60 - 90) * Math.PI / 180;
+    const x0 = 100 + 92 * Math.cos(a0), y0 = 100 + 92 * Math.sin(a0);
+    const x1 = 100 + 92 * Math.cos(a1), y1 = 100 + 92 * Math.sin(a1);
+    inner += `<path d="M100 100 L${x0.toFixed(1)} ${y0.toFixed(1)} A92 92 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)} Z" fill="${cols[k]}" opacity=".82" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>`;
+    const am = (i * 60 + 30 - 90) * Math.PI / 180;
+    const tx = 100 + 60 * Math.cos(am), ty = 100 + 60 * Math.sin(am);
+    inner += `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" font-size="13" font-weight="800" fill="#0b0718" text-anchor="middle" dominant-baseline="middle" transform="rotate(${i * 60 + 30} ${tx.toFixed(1)} ${ty.toFixed(1)})">${KINDS[k]}</text>`;
+  });
+  inner += '<circle cx="100" cy="100" r="22" fill="#140b2b" stroke="#ffb457" stroke-width="3"/>';
+  inner += '<text x="100" y="101" font-size="18" text-anchor="middle" dominant-baseline="middle">💫</text>';
+  svg.innerHTML = inner;
+  wrap.appendChild(svg); wrap.appendChild(needle);
+  return wrap;
+}
+
+function viewTruth(body) {
+  const box = el('div', 'wheelbox');
+  const wheel = buildWheel();
+  box.appendChild(wheel);
+  body.appendChild(box);
+
+  if (spinAnimating) {
+    const idx = WHEEL.map((k, i) => k === G.wheelKind ? i : -1).filter(i => i >= 0);
+    const target = idx[Math.floor(Math.random() * idx.length)];
+    const deg = 360 * 5 + (360 - (target * 60 + 30));
+    requestAnimationFrame(() => { const w = $('wheel'); if (w) w.style.transform = 'rotate(' + deg + 'deg)'; });
+    box.appendChild(waiting('La roue décide de ton sort'));
+    return;
+  }
+
+  if (!G.card) {
+    if (isMyTurn()) box.appendChild(btn('🎡 Tourner la roue', '', () => { beep(400, .2, 'sawtooth', .03); act({ type: 'spin' }); }));
+    else box.appendChild(waiting((YOU.name || 'L’autre') + ' va tourner la roue'));
+    return;
+  }
+
+  const cls = G.card.kind === 'dare' ? 'hot' : (G.card.kind === 'deep' ? 'deep' : 'cool');
+  const icon = G.card.kind === 'dare' ? '#ic-fire' : (G.card.kind === 'deep' ? '#ic-bubble' : '#ic-star');
+  const label = KINDS[G.card.kind] + ' · pour ' + nameOf(G.turn);
+  body.appendChild(card(cls, label, G.card.text, icon));
+
+  if (isMyTurn()) {
+    const row = el('div', 'choices');
+    row.appendChild(btn('✅ Je l’ai fait (+3)', '', () => { burst('confetti', 50); beep(880, .12); act({ type: 'resolve', done: true }); }));
+    row.appendChild(btn('🙈 Je passe (−1)', 'ghost', () => { beep(220, .18, 'square', .04); act({ type: 'resolve', done: false }); }));
+    body.appendChild(row);
+  } else {
+    body.appendChild(waiting((YOU.name || 'L’autre') + ' relève le défi'));
+  }
+}
+
+function viewAnswer(body) {
+  const mode = G.mode;
+  const conf = {
+    never:  { cls: 'hot',  icon: '#ic-hand',   cat: 'Je n’ai jamais…' },
+    likely: { cls: 'cool', icon: '#ic-vote',   cat: 'Qui est le plus susceptible de…' },
+    compat: { cls: 'deep', icon: '#ic-heart',  cat: 'Compatibilité' }
+  }[mode];
+  body.appendChild(card(conf.cls, conf.cat, G.card.text, conf.icon));
+
+  const mine = G.answers[myRole()], theirs = G.answers[other(myRole())];
+  const opts = mode === 'never' ? [{ v: 'yes', l: '🙋 Moi si' }, { v: 'no', l: '🙅 Jamais' }]
+    : mode === 'likely' ? [{ v: myRole(), l: ME.avatar + ' ' + (ME.name || 'Moi') }, { v: other(myRole()), l: YOU.avatar + ' ' + (YOU.name || 'L’autre') }]
+    : G.card.opts.map((o, i) => ({ v: i, l: o }));
+
+  const grid = el('div', 'choices' + (mode === 'compat' ? '' : ''));
+  opts.forEach((o, i) => {
+    const b = el('button', 'choice');
+    const k = el('span', 'k', mode === 'compat' ? 'ABCD'[i] : (i === 0 ? '1' : '2'));
+    b.appendChild(k); b.appendChild(el('span', null, o.l));
+    if (mine === o.v) b.classList.add('picked');
+    if (G.revealed) {
+      b.disabled = true;
+      if (theirs === o.v && mine === o.v) b.classList.add('match');
+      else if (theirs !== o.v && mine !== o.v) b.classList.add('miss');
+    } else if (mine !== null) b.disabled = true;
+    else b.onclick = () => { beep(600, .07); act({ type: 'answer', v: o.v }); };
+    grid.appendChild(b);
+  });
+  body.appendChild(grid);
+
+  if (G.revealed) {
+    const ok = mine === theirs;
+    const r = el('div', 'reveal ' + (ok ? 'good' : 'bad'));
+    const lbl = (v) => mode === 'never' ? (v === 'yes' ? 'Moi si' : 'Jamais')
+      : mode === 'likely' ? nameOf(v) : G.card.opts[v];
+    r.appendChild(el('div', 'big', ok ? '💞 Même réponse !' : '🤔 Pas d’accord'));
+    r.appendChild(el('div', null, (ME.name || 'Moi') + ' : ' + lbl(mine) + '  ·  ' + (YOU.name || 'L’autre') + ' : ' + lbl(theirs)));
+    body.appendChild(r);
+    if (ok && viewAnswer.celebrated !== G.round) { viewAnswer.celebrated = G.round; burst('hearts', 30); beep(760, .1); beep(980, .12); }
+    const nx = el('div', 'row center'); nx.style.marginTop = '12px';
+    nx.appendChild(btn('Carte suivante →', 'cool', () => act({ type: 'next' })));
+    body.appendChild(nx);
+  } else if (mine !== null) {
+    body.appendChild(waiting('Réponse enregistrée. On attend ' + (YOU.name || 'l’autre')));
+  } else {
+    body.appendChild(waiting(theirs !== null ? (YOU.name || 'L’autre') + ' a déjà répondu — à toi' : 'Répondez chacun de votre côté'));
+  }
+}
+
+function viewC4(body) {
+  const grid = el('div', 'c4');
+  const win = G.winLine || [];
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) {
+    const i = r * 7 + c;
+    const cell = el('div', 'cell');
+    if (win.includes(i)) cell.classList.add('win');
+    const v = G.board[i];
+    if (v) {
+      const d = el('div', 'disc ' + (v === myRole() ? 'h' : 'g'), v === myRole() ? '💖' : '💙');
+      cell.appendChild(d);
     }
+    if (!G.winner && isMyTurn()) cell.onclick = () => { beep(480, .06); act({ type: 'drop', col: c }); };
+    grid.appendChild(cell);
+  }
+  body.appendChild(grid);
 
-    // ============================================================
-    // 7. RÉINITIALISER L'INTERFACE
-    // ============================================================
-    function resetUI() {
-        cleanup();
-        document.getElementById('connectionZone').style.display = 'block';
-        gameZone.classList.add('hidden');
-        infoBox.classList.add('hidden');
-        statusDiv.textContent = '🔴 Déconnecté';
-        statusDiv.className = 'status';
-        createBtn.disabled = false;
-        joinBtn.disabled = false;
-        manualConnectBtn.disabled = false;
-        reconnectAttempts = 0;
-        // Garder le message d'accueil
-        if (messageArea.children.length === 0 || messageArea.children[0]?.textContent?.includes('Crée')) {
-            // Déjà présent
-        } else {
-            messageArea.innerHTML = '<div class="msg system">💡 Crée ou rejoint une salle pour commencer.</div>';
-        }
-    }
+  const foot = el('div', 'row center'); foot.style.marginTop = '14px';
+  if (G.winner) {
+    const msg = G.winner === 'draw' ? '🤝 Match nul, personne ne lâche.'
+      : (G.winner === myRole() ? '🏆 Tu gagnes cette manche (+5)' : '😤 ' + (YOU.name || 'L’autre') + ' gagne cette manche');
+    const r = el('div', 'reveal ' + (G.winner === myRole() ? 'good' : 'bad'));
+    r.appendChild(el('div', 'big', msg));
+    body.appendChild(r);
+    if (G.winner === myRole() && viewC4.celebrated !== G.scores[myRole()]) { viewC4.celebrated = G.scores[myRole()]; burst('confetti', 90); beep(660,.1); beep(880,.14); }
+    foot.appendChild(btn('🔄 Revanche', 'cool', () => act({ type: 'reset' })));
+  } else {
+    foot.appendChild(el('span', 'hint', isMyTurn() ? 'Clique une colonne pour lâcher ton cœur.' : 'Patience, ' + (YOU.name || 'l’autre') + ' réfléchit.'));
+  }
+  body.appendChild(foot);
+}
 
-    // ============================================================
-    // 8. CONNEXION MANUELLE
-    // ============================================================
-    function manualConnect(targetId) {
-        const roomName = roomInput.value.trim() || 'couple';
-        const name = nameInput.value.trim() || 'Invité';
-        const cleanTarget = targetId.trim();
-        if (!cleanTarget) {
-            alert('Entrez l\'ID de l\'autre personne.');
-            return;
-        }
-        // Désactiver le bouton pour éviter les doubles clics
-        manualConnectBtn.disabled = true;
-        // Se connecter directement sans utiliser le système de salle
-        cleanup();
-        myName = name;
-        isCreator = false;
-        
-        peer = new Peer(undefined, { // ID aléatoire
-            config: {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'turn:openrelay.metered.ca:443',
-                      username: 'openrelayproject',
-                      credential: 'openrelayproject' }
-                ]
-            }
-        });
+function viewMemory(body) {
+  const grid = el('div', 'mem');
+  const M = G.mem;
+  for (let i = 0; i < 16; i++) {
+    const t = el('div', 'mtile');
+    const shown = M.done[i] || M.up.includes(i);
+    t.textContent = shown ? M.deck[i] : '?';
+    if (M.done[i]) t.classList.add('done'); else if (M.up.includes(i)) t.classList.add('up');
+    if (!shown && isMyTurn() && !G.memLock && !G.winner) t.onclick = () => { beep(560, .05); act({ type: 'flip', i }); };
+    grid.appendChild(t);
+  }
+  body.appendChild(grid);
+  const foot = el('div', 'row center'); foot.style.marginTop = '14px';
+  if (G.winner) {
+    const r = el('div', 'reveal ' + (G.winner === myRole() ? 'good' : 'bad'));
+    r.appendChild(el('div', 'big', G.winner === 'draw' ? '🤝 Égalité parfaite' : (G.winner === myRole() ? '🏆 Tu as la meilleure mémoire' : '🧠 ' + (YOU.name || 'L’autre') + ' t’a battu·e')));
+    body.appendChild(r);
+    foot.appendChild(btn('🔄 Nouvelle grille', 'cool', () => act({ type: 'reset' })));
+  } else {
+    foot.appendChild(el('span', 'hint', isMyTurn() ? 'Retourne deux cartes. Une paire = 1 point et tu rejoues.' : 'Observe bien : ' + (YOU.name || 'l’autre') + ' joue.'));
+  }
+  body.appendChild(foot);
+}
 
-        peer.on('open', (id) => {
-            statusDiv.textContent = `✅ Connecté (ID: ${id})`;
-            statusDiv.className = 'status online';
-            document.getElementById('connectionZone').style.display = 'none';
-            gameZone.classList.remove('hidden');
-            gameStatus.textContent = `🟡 Connexion à ${cleanTarget}...`;
-            gameStatus.className = 'status';
-            myPeerIdSpan.textContent = id;
-            infoBox.classList.remove('hidden');
-            manualPeerId.value = id;
-            
-            addMessage(`🔗 Connexion manuelle à "${cleanTarget}"...`, 'system');
-            const conn = peer.connect(cleanTarget, { reliable: true });
-            connection = conn;
-            setupConnection(conn);
-            
-            setTimeout(() => {
-                if (connection && !connection.open) {
-                    gameStatus.textContent = '❌ Échec de connexion';
-                    gameStatus.className = 'status error';
-                    addMessage(`❌ Impossible de joindre "${cleanTarget}".`, 'system');
-                    addMessage(`💡 Vérifie que l'autre a bien créé sa salle et que son ID est correct.`, 'system');
-                    addMessage(`💡 L'ID est sensible à la casse.`, 'system');
-                    manualConnectBtn.disabled = false;
-                }
-            }, 12000);
-        });
+/* ==========================================================
+   AVERI — 7. DISCUSSION
+   ========================================================== */
+function pushMsg(text, who) {
+  const b = el('div', 'bub ' + who);
+  if (who !== 'sys') {
+    const w = el('span', 'who', who === 'me' ? (ME.name || 'Moi') : (YOU.name || 'L’autre'));
+    b.appendChild(w);
+  }
+  b.appendChild(document.createTextNode(text));
+  const log = $('chatLog');
+  log.appendChild(b); log.scrollTop = log.scrollHeight;
+}
+function sysMsg(t) { pushMsg(t, 'sys'); }
+function updateBadge() {
+  const b = $('chatBadge');
+  b.textContent = unread > 9 ? '9+' : unread;
+  b.classList.toggle('hidden', unread === 0);
+}
+function toggleChat(force) {
+  chatOpen = force != null ? force : !chatOpen;
+  $('chatPanel').classList.toggle('open', chatOpen);
+  if (chatOpen) { unread = 0; updateBadge(); $('chatInput').focus(); }
+}
+function doSend() {
+  const v = $('chatInput').value.trim();
+  if (!v) return;
+  if (!conn || !conn.open) { toast('Pas de liaison active', 'bad'); return; }
+  send({ t: 'chat', text: v.slice(0, 300) });
+  pushMsg(v.slice(0, 300), 'me');
+  $('chatInput').value = '';
+}
 
-        peer.on('error', (err) => {
-            console.error('Manual connect error:', err);
-            addMessage(`❌ Erreur: ${err.message || err.type}`, 'system');
-            manualConnectBtn.disabled = false;
-            setTimeout(() => resetUI(), 3000);
-        });
-    }
+/* ==========================================================
+   AVERI — 8. ÉCRANS
+   ========================================================== */
+function enterGame() {
+  $('screenHome').classList.add('hidden');
+  $('screenGame').classList.remove('hidden');
+  $('dock').classList.remove('hidden');
+  $('chatPanel').classList.remove('hidden');
+  document.querySelector('.wrap').style.justifyContent = 'flex-start';
+  document.querySelector('.wrap').style.paddingTop = '18px';
+  setConn('🟢 Liaison directe établie', 'mine');
+  sysMsg('Liaison pair-à-pair établie (WebRTC, chiffrée). Aucun message ne transite par un serveur de jeu.');
+  render();
+}
+function backHome() {
+  send({ t: 'bye' });
+  cleanup();
+  G = freshState(); YOU = { name: null, avatar: '👤' }; lastSig = ''; lastSpinSeen = 0;
+  $('screenGame').classList.add('hidden');
+  $('screenHome').classList.remove('hidden');
+  $('dock').classList.add('hidden');
+  toggleChat(false);
+  $('chatPanel').classList.add('hidden');
+  document.querySelector('.wrap').style.justifyContent = 'center';
+  document.querySelector('.wrap').style.paddingTop = '14px';
+  $('createBtn').disabled = $('joinBtn').disabled = $('manualConnectBtn').disabled = false;
+  $('idbox').classList.add('hidden');
+  setStatus('🔴 Hors ligne — crée une salle ou rejoins celle de l’autre');
+}
 
-    // ============================================================
-    // 9. ÉVÉNEMENTS
-    // ============================================================
-    createBtn.addEventListener('click', () => {
-        const room = roomInput.value.trim() || 'couple';
-        const name = nameInput.value.trim() || 'Hôte';
-        connectPeer(room, name, true);
-    });
+/* ==========================================================
+   AVERI — 9. INITIALISATION
+   ========================================================== */
+(function init() {
 
-    joinBtn.addEventListener('click', () => {
-        const room = roomInput.value.trim() || 'couple';
-        const name = nameInput.value.trim() || 'Invité';
-        connectPeer(room, name, false);
-    });
+  /* Avatars */
+  const pick0 = Math.floor(Math.random() * AVATARS.length);
+  AVATARS.forEach((a, i) => {
+    const b = el('button', 'av' + (i === pick0 ? ' sel' : ''), a);
+    b.type = 'button';
+    b.onclick = () => {
+      document.querySelectorAll('.av').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel'); ME.avatar = a; beep(700, .05);
+      if (conn && conn.open) send({ t: 'hello', name: ME.name, avatar: ME.avatar, role: ME.role });
+    };
+    $('avatarPicker').appendChild(b);
+  });
+  ME.avatar = AVATARS[pick0];
 
-    manualConnectBtn.addEventListener('click', () => {
-        const targetId = manualPeerId.value.trim();
-        manualConnect(targetId);
-    });
+  /* Tuiles de jeux */
+  GAMES.forEach(g => {
+    const t = el('button', 'gtile'); t.type = 'button';
+    t.innerHTML = '<span class="tag">' + g.tag + '</span>' +
+      '<svg class="art" viewBox="0 0 100 100"><use href="' + g.icon + '"/></svg>' +
+      '<h3>' + esc(g.name) + '</h3><p>' + esc(g.desc) + '</p>';
+    t.onclick = () => {
+      if (!conn || !conn.open) { toast('Attends que l’autre soit connecté·e', 'bad'); return; }
+      beep(660, .08); act({ type: 'setMode', mode: g.id });
+    };
+    $('gamesGrid').appendChild(t);
+  });
 
-    // Permettre "Entrée" dans le champ ID manuel
-    manualPeerId.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') manualConnectBtn.click();
-    });
+  /* Émoticônes */
+  EMOTES.forEach(e => {
+    const b = el('button', null, e); b.type = 'button';
+    b.onclick = () => { flyEmote(e, false); send({ t: 'emote', e }); beep(820, .06, 'triangle'); };
+    $('emoteBar').appendChild(b);
+  });
 
-    sendBtn.addEventListener('click', () => {
-        const text = chatInput.value.trim();
-        if (text) sendMessage(text);
-    });
+  /* Connexion */
+  $('createBtn').onclick = () => start(true);
+  $('joinBtn').onclick = () => start(false);
+  $('diceBtn').onclick = () => {
+    const mots = ['lune','miel','ocean','braise','velours','orage','cerise','nuage','ambre','minuit'];
+    $('roomInput').value = rnd(mots) + '-' + Math.floor(100 + Math.random() * 900);
+    beep(520, .07);
+  };
+  $('manualConnectBtn').onclick = () => {
+    const t = $('manualPeerId').value.trim();
+    if (!t) { toast('Entre l’identifiant de l’autre', 'bad'); return; }
+    start(false, t);
+  };
+  $('manualPeerId').addEventListener('keydown', e => { if (e.key === 'Enter') $('manualConnectBtn').click(); });
+  $('roomInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('createBtn').click(); });
 
-    chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') sendBtn.click();
-    });
+  $('copyIdBtn').onclick = () => copy($('myPeerId').textContent, 'Identifiant copié');
+  $('copyLinkBtn').onclick = () => {
+    const url = location.origin + location.pathname + '#r=' + encodeURIComponent(room);
+    copy(url, 'Lien d’invitation copié — envoie-le-lui');
+  };
 
-    presetBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            chatInput.value = btn.dataset.preset;
-            sendBtn.click();
-        });
-    });
+  /* Jeu */
+  $('backMenuBtn').onclick = () => act({ type: 'menu' });
+  $('quitBtn').onclick = () => { if (confirm('Quitter la partie et fermer la liaison ?')) backHome(); };
 
-    // ============================================================
-    // 10. DIAGNOSTIC DE CONNEXION
-    // ============================================================
-    function checkConnection() {
-        addMessage('🔍 Vérification de la connexion...', 'system');
-        addMessage('📡 Test STUN: ' + (navigator.onLine ? '✅ Internet OK' : '❌ Pas d\'internet'), 'system');
-        addMessage('🌐 PeerJS: ' + (peer ? '✅ Peer initialisé' : '❌ Peer non initialisé'), 'system');
-        addMessage('🔗 Connexion: ' + (connection && connection.open ? '✅ Active' : '❌ Inactive'), 'system');
-    }
+  /* Chat */
+  $('chatToggle').onclick = () => toggleChat();
+  $('sendBtn').onclick = doSend;
+  $('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') doSend(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && chatOpen) toggleChat(false); });
+  $('dock').classList.add('hidden');
 
-    // Ajouter un bouton de diagnostic (accessible via console)
-    window.checkConnection = checkConnection;
+  /* Invitation par lien */
+  const m = location.hash.match(/[#&]r=([^&]+)/);
+  if (m) {
+    $('roomInput').value = decodeURIComponent(m[1]);
+    setStatus('💌 Invitation détectée — mets ton prénom puis « Rejoindre »', 'warn');
+    $('nameInput').focus();
+  }
 
-    // Message initial
-    addMessage('💡 Crée ou rejoint une salle pour commencer.', 'system');
-    addMessage('📋 Si la connexion automatique échoue, utilise le mode manuel.', 'system');
+  /* Filet de sécurité si le CDN PeerJS n’a pas répondu */
+  if (typeof Peer === 'undefined') {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.1/peerjs.min.js';
+    s.onerror = () => setStatus('❌ Impossible de charger la librairie WebRTC. Vérifie ta connexion.', 'err');
+    document.head.appendChild(s);
+  }
 
-    console.log('💡 Jeu à Deux chargé.');
-    console.log('📋 Utilise checkConnection() pour diagnostiquer.');
+  addEventListener('beforeunload', () => { send({ t: 'bye' }); cleanup(); });
+})();
+
+function copy(txt, okMsg) {
+  const done = () => toast('✅ ' + okMsg, 'good');
+  if (navigator.clipboard && location.protocol !== 'file:') {
+    navigator.clipboard.writeText(txt).then(done).catch(() => fallback());
+  } else fallback();
+  function fallback() {
+    const ta = el('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { prompt('Copie ceci :', txt); }
+    ta.remove();
+  }
+}
 </script>
 </body>
 </html>
