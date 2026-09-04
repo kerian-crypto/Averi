@@ -408,6 +408,7 @@ details.helper .body{padding:14px 16px}
       <span>Ton identifiant :</span> <code id="myPeerId">—</code>
       <button class="btn xs ghost" id="copyIdBtn">📋 Copier</button>
       <button class="btn xs ghost" id="copyLinkBtn">🔗 Copier l’invitation</button>
+      <button class="btn xs ghost hidden" id="newLinkBtn" title="Annule le lien précédent et libère la place">🔄 Nouveau lien</button>
     </div>
 
     <details class="helper">
@@ -418,6 +419,7 @@ details.helper .body{padding:14px 16px}
           <button class="btn ghost sm" id="manualConnectBtn">Connexion directe</button>
         </div>
         <p class="hint">L’hôte crée la salle en premier, puis communique l’identifiant affiché. Le lien d’invitation fait la même chose automatiquement.</p>
+        <p class="hint">Même en connexion directe, la personne invitée doit avoir ouvert le lien d’invitation : c’est lui qui lui donne accès à la salle, sans licence de son côté.</p>
         <p class="hint">Tout transite en pair-à-pair (WebRTC). Rien n’est stocké : à la fermeture de l’onglet, la partie disparaît.</p>
       </div>
     </details>
@@ -532,6 +534,23 @@ window.AveriLicense = (function () {
 
     /** Marge de tolérance sur les bornes de validité d'une licence (décalage de fuseau/horloge). */
     const LICENSE_CLOCK_GRACE_MS = 24 * 60 * 60 * 1000;
+
+    /* ----------------------------------------------------------
+       INVITATION DE SALLE
+       ----------------------------------------------------------
+       L'invité ne présente pas de licence : il présente un lien
+       émis par l'hôte. Ces bornes valent pour les deux côtés — un
+       lien qui les dépasse n'a pas été fabriqué par cette version.
+       ---------------------------------------------------------- */
+
+    /** Version du protocole d'invitation. Un lien d'une autre version est refusé. */
+    const INVITE_VERSION = 1;
+
+    /** Durée de vie par défaut d'un lien : le temps d'une soirée. */
+    const INVITE_TTL_MS = 12 * 60 * 60 * 1000;
+
+    /** Plafond absolu. Un lien qui prétend durer davantage est écarté. */
+    const INVITE_MAX_TTL_MS = 24 * 60 * 60 * 1000;
 
     /* ----------------------------------------------------------
        CATALOGUE DES FEATURES
@@ -680,6 +699,9 @@ window.AveriLicense = (function () {
     __averiExports["DEMO_WARNING_MS"] = DEMO_WARNING_MS;
     __averiExports["CLOCK_SKEW_TOLERANCE_MS"] = CLOCK_SKEW_TOLERANCE_MS;
     __averiExports["LICENSE_CLOCK_GRACE_MS"] = LICENSE_CLOCK_GRACE_MS;
+    __averiExports["INVITE_VERSION"] = INVITE_VERSION;
+    __averiExports["INVITE_TTL_MS"] = INVITE_TTL_MS;
+    __averiExports["INVITE_MAX_TTL_MS"] = INVITE_MAX_TTL_MS;
     __averiExports["FEATURES"] = FEATURES;
     __averiExports["ALL_FEATURES"] = ALL_FEATURES;
     __averiExports["GAME_FEATURE_OF"] = GAME_FEATURE_OF;
@@ -728,12 +750,18 @@ window.AveriLicense = (function () {
       LICENSE_VERSION_UNSUPPORTED: 'LICENSE_VERSION_UNSUPPORTED',
       LICENSE_UNKNOWN:          'LICENSE_UNKNOWN',
 
+      /* Invitation — l'invité ne possède pas de licence : il joue sur
+         les droits que l'hôte lui a transmis par son lien d'adhésion. */
+      GUEST_SESSION: 'GUEST_SESSION',
+
       /* Environnement */
       CLOCK_TAMPERED: 'CLOCK_TAMPERED'
     };
 
     /** États qui donnent accès aux fonctionnalités protégées. */
-    const GRANTING_STATUSES = new Set([STATUS.DEMO_ACTIVE, STATUS.LICENSE_ACTIVE]);
+    const GRANTING_STATUSES = new Set([
+      STATUS.DEMO_ACTIVE, STATUS.LICENSE_ACTIVE, STATUS.GUEST_SESSION
+    ]);
 
     function isGranting(status) {
       return GRANTING_STATUSES.has(status);
@@ -800,6 +828,10 @@ window.AveriLicense = (function () {
       LICENSE_UNKNOWN: {
         title: 'Aucune licence active',
         body: 'Activez une licence ou lancez la démonstration.'
+      },
+      GUEST_SESSION: {
+        title: 'Vous êtes invité·e',
+        body: 'La personne qui a créé la salle vous ouvre ses manches, le temps de la partie.'
       },
       CLOCK_TAMPERED: {
         title: 'Horloge incohérente',
@@ -3528,6 +3560,501 @@ window.AveriLicense = (function () {
     __averiExports["intersectFeatures"] = intersectFeatures;
   });
 
+  __averiDefine("licensing/invitation.js", function (__averiExports, __averiRequire) {
+    /* ==========================================================
+       AVERI LICENSING — Invitation de salle
+       ----------------------------------------------------------
+       Averi se joue à deux, et une seule des deux personnes achète.
+       L'invité ne présente donc aucune licence : il présente un
+       LIEN D'ADHÉSION émis par l'hôte, qui porte les droits de la
+       session et prouve son origine.
+
+       Pourquoi un HMAC et non une signature Ed25519 ?
+       ----------------------------------------------------------
+       Signer demanderait une clé privée dans le navigateur de
+       l'hôte — exactement ce que l'architecture interdit (voir
+       `ed25519.js`, qui ne sait que vérifier). Or la vérification
+       n'a pas besoin d'être publique : le seul vérificateur est
+       l'hôte lui-même, qui a émis le lien. Un HMAC dont il est le
+       seul détenteur de la clé suffit, et ne fait entrer aucun
+       secret nouveau dans le produit.
+
+       Le ticket porte quand même l'EN-TÊTE de la clé publique de
+       vérification (`kid`) et l'empreinte de la licence de l'hôte :
+       l'invité peut ainsi refuser, avant toute connexion, un lien
+       qui ne se rattache pas à une clé qu'il connaît.
+
+       Ce que ce protocole garantit
+       ----------------------------------------------------------
+       1. Un lien non émis par l'hôte est rejeté (MAC).
+       2. Un lien modifié — salle, droits, expiration — est rejeté.
+       3. Un lien périmé est rejeté des deux côtés.
+       4. Le MAC ne transite jamais : l'invité en fait la preuve par
+          défi-réponse, ce qui rend inutile l'interception du canal.
+       5. Une salle n'accueille QUE deux personnes : le premier
+          invité admis prend le siège, et lui seul peut y revenir.
+
+       Ce qu'il ne garantit pas : que l'hôte ne partage pas son lien
+       à un tiers avant l'arrivée du destinataire. Le premier arrivé
+       prend le siège. Voir docs/licensing/invitation.md.
+       ========================================================== */
+
+    const { b64uEncode, b64uDecode, utf8Encode, utf8Decode, toHex, bytesEqual } = __averiRequire("licensing/base64.js");
+    const { hmacSha512 } = __averiRequire("licensing/sha512.js");
+    const { INVITE_VERSION, INVITE_TTL_MS, INVITE_MAX_TTL_MS, TRUSTED_KEYS, ACTIVE_KEY_ID } = __averiRequire("licensing/config.js");
+
+    /* ----------------------------------------------------------
+       Domaines de séparation.
+       Un même secret sert à deux calculs distincts ; les préfixer
+       empêche qu'une valeur produite pour l'un soit rejouée dans
+       l'autre.
+       ---------------------------------------------------------- */
+    const DOMAIN_TICKET = 'averi-invite-v1|';
+    const DOMAIN_PROOF = 'averi-join-v1|';
+
+    /** Longueur retenue des MAC : 32 octets suffisent, et raccourcissent le lien. */
+    const MAC_BYTES = 32;
+
+    /** Motifs de refus, explicites et destinés à être affichés. */
+    const JOIN_REJECT = {
+      MISSING: 'INVITE_MISSING',
+      MALFORMED: 'INVITE_MALFORMED',
+      VERSION: 'INVITE_VERSION',
+      UNKNOWN_KEY: 'INVITE_UNKNOWN_KEY',
+      EXPIRED: 'INVITE_EXPIRED',
+      ROOM_MISMATCH: 'INVITE_ROOM_MISMATCH',
+      FORGED: 'INVITE_FORGED',
+      ALREADY_USED: 'INVITE_ALREADY_USED',
+      SUPERSEDED: 'INVITE_SUPERSEDED',
+      ROOM_FULL: 'ROOM_FULL'
+    };
+
+    const JOIN_MESSAGES = {
+      INVITE_MISSING: {
+        title: 'Il faut le lien d’invitation',
+        body: 'Demandez à la personne qui a créé la salle de vous envoyer son lien.'
+      },
+      INVITE_MALFORMED: {
+        title: 'Ce lien d’invitation est incomplet',
+        body: 'Recopiez-le entièrement depuis le message reçu, sans le couper.'
+      },
+      INVITE_VERSION: {
+        title: 'Ce lien vient d’une autre version d’Averi',
+        body: 'Mettez Averi à jour, ou demandez un nouveau lien.'
+      },
+      INVITE_UNKNOWN_KEY: {
+        title: 'Ce lien ne vient pas d’Averi',
+        body: 'Il n’est rattaché à aucune version connue de l’application.'
+      },
+      INVITE_EXPIRED: {
+        title: 'Ce lien d’invitation a expiré',
+        body: 'Demandez-en un nouveau à la personne qui a créé la salle.'
+      },
+      INVITE_ROOM_MISMATCH: {
+        title: 'Ce lien ne correspond pas à cette salle',
+        body: 'Ouvrez le lien tel qu’il vous a été envoyé, sans modifier le code de salle.'
+      },
+      INVITE_FORGED: {
+        title: 'Ce lien d’invitation n’est pas valide',
+        body: 'Il n’a pas été émis par cette salle. Demandez le vrai lien.'
+      },
+      INVITE_ALREADY_USED: {
+        title: 'Ce lien a déjà servi',
+        body: 'Il est réservé à la personne qui l’a ouvert en premier. Demandez-en un nouveau.'
+      },
+      INVITE_SUPERSEDED: {
+        title: 'Ce lien a été remplacé',
+        body: 'La personne qui a créé la salle en a envoyé un nouveau. Utilisez le dernier reçu.'
+      },
+      ROOM_FULL: {
+        title: 'La salle est complète',
+        body: 'Averi se joue à deux : deux personnes y sont déjà.'
+      }
+    };
+
+    function joinMessage(code) {
+      return JOIN_MESSAGES[code] || JOIN_MESSAGES.INVITE_MALFORMED;
+    }
+
+    /* ----------------------------------------------------------
+       Aléa
+       ---------------------------------------------------------- */
+
+    /** Octets aléatoires, cryptographiquement sûrs quand la plateforme le permet. */
+    function randomBytes(n) {
+      const out = new Uint8Array(n);
+      const c = (typeof globalThis !== 'undefined' && globalThis.crypto) ? globalThis.crypto : null;
+      if (c && typeof c.getRandomValues === 'function') c.getRandomValues(out);
+      else for (let i = 0; i < n; i++) out[i] = Math.floor(Math.random() * 256);
+      return out;
+    }
+
+    const randomHex = (n) => toHex(randomBytes(n));
+
+    /* ----------------------------------------------------------
+       Ticket
+       ---------------------------------------------------------- */
+
+    /**
+     * Sérialisation canonique du corps du ticket.
+     *
+     * Les clés sont écrites dans un ordre fixe : deux exécutions
+     * doivent produire exactement les mêmes octets, sinon le MAC
+     * recalculé à la vérification ne retomberait pas juste.
+     */
+    function canonical(body) {
+      return JSON.stringify({
+        v: body.v, rid: body.rid, kid: body.kid, lic: body.lic,
+        hst: body.hst, nid: body.nid, iat: body.iat, exp: body.exp,
+        ftr: body.ftr
+      });
+    }
+
+    function macOf(roomKey, encodedBody) {
+      return hmacSha512(roomKey, utf8Encode(DOMAIN_TICKET + encodedBody)).slice(0, MAC_BYTES);
+    }
+
+    /**
+     * Preuve de détention du ticket.
+     *
+     * L'invité connaît le MAC (il est dans son lien) ; l'hôte sait
+     * le recalculer. Aucun des deux n'a besoin de l'envoyer : il
+     * suffit d'en dériver une réponse au défi de l'hôte.
+     */
+    function proofFor(macBytes, challenge, encodedBody) {
+      return b64uEncode(
+        hmacSha512(macBytes, utf8Encode(DOMAIN_PROOF + challenge + '|' + encodedBody)).slice(0, MAC_BYTES)
+      );
+    }
+
+    const isStr = (x) => typeof x === 'string' && x.length > 0;
+
+    /**
+     * Contrôles structurels du corps du ticket, réalisables SANS la
+     * clé de la salle.
+     *
+     * C'est tout ce que l'invité peut faire, et il doit le faire :
+     * un lien mal formé, périmé, ou rattaché à une clé inconnue est
+     * écarté avant même d'ouvrir une connexion.
+     *
+     * @param {string} encodedBody corps du ticket, en base64url
+     * @param {{now?:number, room?:string|null, trustedKeys?:object}} opts
+     * @returns {{ok:boolean, code:string|null, body:object|null}}
+     */
+    function inspectBody(encodedBody, opts) {
+      opts = opts || {};
+      const now = opts.now == null ? Date.now() : opts.now;
+      const keys = opts.trustedKeys || TRUSTED_KEYS;
+      const fail = (code) => ({ ok: false, code, body: null });
+
+      const raw = String(encodedBody == null ? '' : encodedBody).replace(/\s+/g, '');
+      if (!raw) return fail(JOIN_REJECT.MISSING);
+
+      let body;
+      try {
+        body = JSON.parse(utf8Decode(b64uDecode(raw)));
+      } catch (_) {
+        return fail(JOIN_REJECT.MALFORMED);
+      }
+      if (!body || typeof body !== 'object') return fail(JOIN_REJECT.MALFORMED);
+
+      if (body.v !== INVITE_VERSION) return fail(JOIN_REJECT.VERSION);
+      if (!isStr(body.rid) || !isStr(body.kid) || !isStr(body.nid) || !isStr(body.hst)) {
+        return fail(JOIN_REJECT.MALFORMED);
+      }
+      if (!Number.isInteger(body.iat) || !Number.isInteger(body.exp) || body.exp <= body.iat) {
+        return fail(JOIN_REJECT.MALFORMED);
+      }
+      if (!Array.isArray(body.ftr) || body.ftr.some(f => typeof f !== 'string')) {
+        return fail(JOIN_REJECT.MALFORMED);
+      }
+      // Un ticket dont la durée de vie dépasse le plafond a été fabriqué
+      // ailleurs que par cette version : le refuser tout de suite.
+      if ((body.exp - body.iat) * 1000 > INVITE_MAX_TTL_MS) return fail(JOIN_REJECT.MALFORMED);
+
+      // L'en-tête de clé publique : le lien se rattache-t-il à une clé connue ?
+      if (!Object.prototype.hasOwnProperty.call(keys, body.kid)) return fail(JOIN_REJECT.UNKNOWN_KEY);
+
+      if (body.exp * 1000 <= now) return fail(JOIN_REJECT.EXPIRED);
+      if (opts.room && body.rid !== opts.room) return fail(JOIN_REJECT.ROOM_MISMATCH);
+
+      return { ok: true, code: null, body };
+    }
+
+    /**
+     * Découpe un lien complet `corps.mac` et en contrôle la structure.
+     *
+     * Le MAC n'est PAS vérifié ici : il ne peut l'être que par l'hôte,
+     * seul détenteur de la clé de salle. C'est le défi-réponse qui s'en
+     * charge, sans que le MAC ait à circuler.
+     *
+     * @returns {{ok:boolean, code:string|null, body:object|null,
+     *            encodedBody:string|null, mac:Uint8Array|null}}
+     */
+    function inspectTicket(ticket, opts) {
+      const fail = (code) => ({ ok: false, code, body: null, encodedBody: null, mac: null });
+
+      const raw = String(ticket == null ? '' : ticket).replace(/\s+/g, '');
+      if (!raw) return fail(JOIN_REJECT.MISSING);
+
+      const parts = raw.split('.');
+      if (parts.length !== 2 || !parts[0] || !parts[1]) return fail(JOIN_REJECT.MALFORMED);
+
+      let mac;
+      try {
+        mac = b64uDecode(parts[1]);
+      } catch (_) {
+        return fail(JOIN_REJECT.MALFORMED);
+      }
+      if (mac.length !== MAC_BYTES) return fail(JOIN_REJECT.MALFORMED);
+
+      const seen = inspectBody(parts[0], opts);
+      if (!seen.ok) return fail(seen.code);
+
+      return { ok: true, code: null, body: seen.body, encodedBody: parts[0], mac };
+    }
+
+    /** Droits portés par un lien, sans le valider. Sert à l'affichage. */
+    function ticketFeatures(ticket) {
+      const r = inspectTicket(ticket, { now: 0 });
+      return r.body ? r.body.ftr.slice() : [];
+    }
+
+    /* ----------------------------------------------------------
+       RoomGuard — côté hôte
+       ---------------------------------------------------------- */
+
+    /**
+     * Gardien de la salle. Il détient la clé de salle, émet les
+     * liens et décide seul qui entre.
+     *
+     * La clé de salle ne quitte jamais la mémoire : elle n'est ni
+     * persistée ni transmise. Fermer l'onglet ferme la salle, et
+     * tous les liens émis deviennent inutilisables — ce qui est la
+     * propriété recherchée.
+     */
+    class RoomGuard {
+      /**
+       * @param {{room:string, hostFingerprint:string, licenseDigest?:string,
+       *          keyId?:string, ttlMs?:number, now?:function}} opts
+       */
+      constructor(opts) {
+        opts = opts || {};
+        if (!isStr(opts.room)) throw new Error('RoomGuard : salle manquante');
+
+        this.room = opts.room;
+        this.hostFingerprint = String(opts.hostFingerprint || '').slice(0, 16) || '0'.repeat(16);
+        this.licenseDigest = String(opts.licenseDigest || '').slice(0, 16);
+        this.keyId = opts.keyId || ACTIVE_KEY_ID;
+        this.ttlMs = Math.min(opts.ttlMs || INVITE_TTL_MS, INVITE_MAX_TTL_MS);
+        this._now = opts.now || (() => Date.now());
+
+        /** Clé de la salle : 32 octets, mémoire seulement. */
+        this.roomKey = randomBytes(32);
+
+        /**
+         * Lien en vigueur. Une salle n'en a qu'UN de vivant à la fois :
+         * en émettre un nouveau est le geste par lequel l'hôte révoque le
+         * précédent, ce qui n'aurait aucun sens si l'ancien continuait
+         * d'ouvrir la porte.
+         */
+        this.currentNid = null;
+
+        /** Siège de l'invité. Une salle, deux personnes, un seul siège. */
+        this.seat = null;          // { nid, device, since }
+        /** Défi en cours, le temps qu'une candidature se vérifie. */
+        this.pending = null;       // { nid, device, challenge, encodedBody }
+        this.issued = 0;
+      }
+
+      /**
+       * Émet un lien d'adhésion.
+       *
+       * @param {{features:string[], ttlMs?:number}} opts
+       * @returns {{ticket:string, nid:string, expiresAt:number, features:string[]}}
+       */
+      issue(opts) {
+        opts = opts || {};
+        const now = this._now();
+        const ttl = Math.min(opts.ttlMs || this.ttlMs, INVITE_MAX_TTL_MS);
+
+        // `session.unlimited` ouvre la CRÉATION d'une salle : un invité ne
+        // doit jamais l'obtenir par un lien, sans quoi il pourrait ouvrir
+        // la sienne et réinviter à l'infini.
+        const features = (opts.features || []).filter(f => typeof f === 'string' && f !== 'session.unlimited');
+
+        const body = {
+          v: INVITE_VERSION,
+          rid: this.room,
+          kid: this.keyId,
+          lic: this.licenseDigest,
+          hst: this.hostFingerprint,
+          nid: randomHex(12),
+          iat: Math.floor(now / 1000),
+          exp: Math.floor((now + ttl) / 1000),
+          ftr: features
+        };
+
+        const encodedBody = b64uEncode(utf8Encode(canonical(body)));
+        const ticket = encodedBody + '.' + b64uEncode(macOf(this.roomKey, encodedBody));
+
+        // Émettre un nouveau lien révoque le précédent et libère le siège :
+        // c'est le geste par lequel l'hôte reprend la main sur qui peut entrer.
+        this.currentNid = body.nid;
+        this.seat = null;
+        this.pending = null;
+        this.issued++;
+
+        return { ticket, nid: body.nid, expiresAt: body.exp * 1000, features: features.slice() };
+      }
+
+      /** La salle a-t-elle déjà ses deux personnes ? */
+      get occupied() { return this.seat !== null; }
+
+      /**
+       * Première étape : la candidature est-elle recevable ?
+       * Retourne un défi si oui. Ne donne accès à rien.
+       *
+       * @param {{encodedBody:string, mac?:string, device:string}} claim
+       * @returns {{ok:boolean, code:string|null, challenge:string|null}}
+       */
+      challenge(claim) {
+        claim = claim || {};
+        const device = String(claim.device || '').slice(0, 32);
+        const encodedBody = String(claim.encodedBody || '');
+
+        // La candidature ne transporte que le CORPS du ticket. Le MAC reste
+        // chez l'invité : c'est la réponse au défi qui en prouvera la
+        // détention, sans jamais le faire circuler.
+        const seen = inspectBody(encodedBody, { now: this._now(), room: this.room });
+        if (!seen.ok) return { ok: false, code: seen.code, challenge: null };
+
+        // Un lien qui n'est plus celui en vigueur ne vaut plus rien, même
+        // s'il est authentique et pas encore expiré.
+        if (this.currentNid && seen.body.nid !== this.currentNid) {
+          return { ok: false, code: JOIN_REJECT.SUPERSEDED, challenge: null };
+        }
+
+        if (this.seat) {
+          if (this.seat.nid !== seen.body.nid) return { ok: false, code: JOIN_REJECT.ROOM_FULL, challenge: null };
+          // Même lien, autre appareil : le lien a été repartagé.
+          if (this.seat.device !== device) return { ok: false, code: JOIN_REJECT.ALREADY_USED, challenge: null };
+        }
+
+        const challenge = randomHex(16);
+        this.pending = { nid: seen.body.nid, device, challenge, encodedBody };
+        return { ok: true, code: null, challenge };
+      }
+
+      /**
+       * Seconde étape : la preuve tient-elle ?
+       *
+       * Seul le porteur du lien complet — MAC compris — peut la
+       * produire. Un tiers qui aurait observé le corps du ticket sur
+       * le fil en est incapable.
+       *
+       * @returns {{ok:boolean, code:string|null, features:string[]|null, nid:string|null}}
+       */
+      verify(proof) {
+        const p = this.pending;
+        this.pending = null;
+        if (!p) return { ok: false, code: JOIN_REJECT.FORGED, features: null, nid: null };
+
+        const expected = proofFor(macOf(this.roomKey, p.encodedBody), p.challenge, p.encodedBody);
+        const a = utf8Encode(String(proof || ''));
+        const b = utf8Encode(expected);
+        if (!bytesEqual(a, b)) return { ok: false, code: JOIN_REJECT.FORGED, features: null, nid: null };
+
+        // Le corps est revalidé à cet instant précis : entre le défi et la
+        // réponse, le lien a pu expirer ou être remplacé.
+        const seen = inspectBody(p.encodedBody, { now: this._now(), room: this.room });
+        if (!seen.ok) return { ok: false, code: seen.code, features: null, nid: null };
+        if (this.currentNid && seen.body.nid !== this.currentNid) {
+          return { ok: false, code: JOIN_REJECT.SUPERSEDED, features: null, nid: null };
+        }
+
+        this.seat = { nid: p.nid, device: p.device, since: this._now() };
+        return { ok: true, code: null, features: seen.body.ftr.slice(), nid: p.nid };
+      }
+
+      /**
+       * L'invité s'est déconnecté. Le siège reste À LUI : il pourra
+       * revenir, et personne d'autre ne prendra sa place tant que
+       * l'hôte n'aura pas émis un nouveau lien.
+       */
+      disconnected() { this.pending = null; }
+
+      /** État lisible, pour l'affichage et les diagnostics. */
+      describe() {
+        return {
+          room: this.room,
+          issued: this.issued,
+          occupied: this.occupied,
+          seatSince: this.seat ? this.seat.since : null
+        };
+      }
+    }
+
+    /* ----------------------------------------------------------
+       GuestSession — côté invité
+       ---------------------------------------------------------- */
+
+    /**
+     * Droits accordés le temps d'une partie, par le lien de l'hôte.
+     *
+     * Rien n'en est persisté : ni jeton, ni date, ni feature. Fermer
+     * l'onglet efface tout. Un invité ne « garde » jamais de droits.
+     */
+    class GuestSession {
+      constructor(opts) {
+        opts = opts || {};
+        this._now = opts.now || (() => Date.now());
+        this.clear();
+      }
+
+      /**
+       * @param {{features:string[], expiresAt:number, room:string, host?:string}} grant
+       */
+      adopt(grant) {
+        grant = grant || {};
+        const features = (grant.features || [])
+          .filter(f => typeof f === 'string' && f !== 'session.unlimited');
+        this.features = features;
+        this.expiresAt = Number(grant.expiresAt) || 0;
+        this.room = grant.room || null;
+        this.host = grant.host || null;
+        this.active = features.length > 0;
+        return this.active;
+      }
+
+      clear() {
+        this.features = [];
+        this.expiresAt = 0;
+        this.room = null;
+        this.host = null;
+        this.active = false;
+      }
+
+      /** Session encore valable ? Le lien porte sa propre échéance. */
+      get valid() {
+        return this.active && (this.expiresAt === 0 || this.expiresAt > this._now());
+      }
+
+      has(feature) { return this.valid && this.features.indexOf(feature) !== -1; }
+    }
+
+    __averiExports["JOIN_REJECT"] = JOIN_REJECT;
+    __averiExports["JOIN_MESSAGES"] = JOIN_MESSAGES;
+    __averiExports["joinMessage"] = joinMessage;
+    __averiExports["randomBytes"] = randomBytes;
+    __averiExports["proofFor"] = proofFor;
+    __averiExports["inspectBody"] = inspectBody;
+    __averiExports["inspectTicket"] = inspectTicket;
+    __averiExports["ticketFeatures"] = ticketFeatures;
+    __averiExports["RoomGuard"] = RoomGuard;
+    __averiExports["GuestSession"] = GuestSession;
+  });
+
   __averiDefine("licensing/facade.js", function (__averiExports, __averiRequire) {
     /* ==========================================================
        AVERI LICENSING — LicenseFacade
@@ -3553,6 +4080,7 @@ window.AveriLicense = (function () {
     const { Journal } = __averiRequire("licensing/journal.js");
     const { Entitlements, intersectFeatures } = __averiRequire("licensing/entitlements.js");
     const { normalizeToken } = __averiRequire("licensing/license-format.js");
+    const { RoomGuard, GuestSession, inspectTicket, proofFor, joinMessage, JOIN_REJECT } = __averiRequire("licensing/invitation.js");
 
     class LicenseFacade {
       /**
@@ -3610,6 +4138,19 @@ window.AveriLicense = (function () {
           journal: this.journal
         });
 
+        /**
+         * Salle hébergée ici, s'il y en a une. C'est le gardien du lien
+         * d'adhésion : il détient la clé de salle, qui ne quitte jamais
+         * la mémoire de cet onglet.
+         */
+        this.roomGuard = null;
+
+        /** Droits reçus d'un hôte, quand on est l'invité. Jamais persistés. */
+        this.guest = new GuestSession({ now: () => this.clock.wallNow() });
+
+        /** Lien d'adhésion dont on dispose, côté invité. */
+        this._invite = null;
+
         this._listeners = new Set();
         this._lastStatus = null;
         this._timer = null;
@@ -3638,6 +4179,15 @@ window.AveriLicense = (function () {
        *            warning:boolean, canStartDemo:boolean, isPrivate:boolean}}
        */
       getStatus() {
+        const own = this._evaluateOwn();
+        // Une licence ou une démonstration en cours prime : on ne rétrograde
+        // jamais quelqu'un qui a payé au rang d'invité.
+        if (own.unlocked || !this.guest.valid) return own;
+        return this._composeGuest(own);
+      }
+
+      /** État tiré des seuls droits propres à cet appareil. */
+      _evaluateOwn() {
         const stored = this.activation.storedToken();
 
         if (stored) {
@@ -3715,8 +4265,37 @@ window.AveriLicense = (function () {
           remainingLabel: state === STATUS.DEMO_ACTIVE ? formatDuration(demoState.remainingMs) : null,
           warning: state === STATUS.DEMO_ACTIVE && demoState.warning,
           canStartDemo: demoState.status === STATUS.DEMO_AVAILABLE,
-          isPrivate: !!(licenseInfo && licenseInfo.type === 'private')
+          isPrivate: !!(licenseInfo && licenseInfo.type === 'private'),
+          guest: null
         };
+      }
+
+      /**
+       * État d'un invité : les droits viennent du lien de l'hôte, pas
+       * d'une licence locale. Le reste de l'état — démonstration, appareil,
+       * anomalies d'horloge — est conservé tel quel : rejoindre une partie
+       * ne consomme pas la démonstration et ne masque rien.
+       */
+      _composeGuest(own) {
+        const entitlements = new Entitlements({
+          source: 'guest',
+          status: STATUS.GUEST_SESSION,
+          features: this.guest.features,
+          expiresAt: this.guest.expiresAt
+        });
+        return Object.assign({}, own, {
+          state: STATUS.GUEST_SESSION,
+          entitlements,
+          message: userMessage(STATUS.GUEST_SESSION),
+          unlocked: true,
+          guest: {
+            active: true,
+            room: this.guest.room,
+            host: this.guest.host,
+            expiresAt: this.guest.expiresAt,
+            features: this.guest.features.slice()
+          }
+        });
       }
 
       /** Droits effectifs seuls — raccourci pour le code de jeu. */
@@ -3987,6 +4566,184 @@ window.AveriLicense = (function () {
       /** Droits communs aux deux joueurs. */
       sharedFeatures(peerFeatures) {
         return intersectFeatures(this.entitlements(), peerFeatures);
+      }
+
+      /* ---------------------------------------------------------- */
+      /* Salle : côté hôte                                          */
+      /* ---------------------------------------------------------- */
+
+      /**
+       * Ouvre une salle et devient son gardien.
+       *
+       * Réservé à qui peut réellement héberger : un invité, qui ne tient
+       * ses droits que d'un lien, ne doit pas pouvoir ouvrir la sienne et
+       * réinviter à son tour.
+       *
+       * @returns {{ok:boolean, reason:string|null}}
+       */
+      openRoom(roomId) {
+        if (!this.canHost()) return { ok: false, reason: 'session.unlimited' };
+        this.roomGuard = new RoomGuard({
+          room: String(roomId || ''),
+          hostFingerprint: this.identity.fingerprint.slice(0, 16),
+          licenseDigest: this._licenseDigest(),
+          now: () => this.clock.wallNow()
+        });
+        this.journal.append('salle_ouverte', { room: this.roomGuard.room });
+        return { ok: true, reason: null };
+      }
+
+      /** Ferme la salle. Tous les liens émis deviennent inutilisables. */
+      closeRoom() {
+        if (this.roomGuard) this.journal.append('salle_fermée', this.roomGuard.describe());
+        this.roomGuard = null;
+      }
+
+      /**
+       * Émet un lien d'adhésion pour la salle ouverte.
+       *
+       * Nommée `createInvite` et non `issueInvite` : `tests/facade.test.mjs`
+       * refuse toute méthode de façade dont le nom laisse croire qu'on peut
+       * y émettre une licence. Un lien d'adhésion n'en est pas une, et le
+       * garde-fou vaut mieux que le mot juste.
+       *
+       * Le lien porte les droits de l'hôte : c'est ce qui permet à l'invité
+       * de jouer sans licence. Émettre un nouveau lien libère le siège.
+       *
+       * @returns {{ok:boolean, ticket:string|null, expiresAt:number, features:string[]}}
+       */
+      createInvite(opts) {
+        if (!this.roomGuard || !this.canHost()) {
+          return { ok: false, ticket: null, expiresAt: 0, features: [] };
+        }
+        const r = this.roomGuard.issue(Object.assign({ features: this.entitlements().features }, opts || {}));
+        this.journal.append('lien_émis', { room: this.roomGuard.room, expiresAt: r.expiresAt });
+        return { ok: true, ticket: r.ticket, expiresAt: r.expiresAt, features: r.features };
+      }
+
+      /** Première étape de l'admission : le lien présenté est-il recevable ? */
+      challengeJoin(claim) {
+        if (!this.roomGuard) return { ok: false, code: JOIN_REJECT.MISSING, challenge: null };
+        const r = this.roomGuard.challenge(claim);
+        if (!r.ok) this.journal.append('adhésion_refusée', { code: r.code });
+        return r;
+      }
+
+      /** Seconde étape : la preuve de détention du lien tient-elle ? */
+      verifyJoin(proof) {
+        if (!this.roomGuard) return { ok: false, code: JOIN_REJECT.MISSING, features: null, nid: null };
+        const r = this.roomGuard.verify(proof);
+        this.journal.append(r.ok ? 'adhésion_admise' : 'adhésion_refusée', { code: r.code });
+        return r;
+      }
+
+      /** L'invité s'est déconnecté : son siège lui reste réservé. */
+      guestDisconnected() {
+        if (this.roomGuard) this.roomGuard.disconnected();
+      }
+
+      /** La salle a-t-elle déjà ses deux personnes ? */
+      roomOccupied() { return !!(this.roomGuard && this.roomGuard.occupied); }
+
+      /* ---------------------------------------------------------- */
+      /* Salle : côté invité                                        */
+      /* ---------------------------------------------------------- */
+
+      /**
+       * Examine un lien reçu, sans rien accorder.
+       *
+       * Tout ce qui est vérifiable sans la clé de la salle l'est ici :
+       * format, version, en-tête de clé publique, échéance, salle. Le reste
+       * — l'authenticité — ne peut l'être que par l'hôte, et le sera au
+       * moment de la connexion.
+       *
+       * @returns {{ok:boolean, code:string|null, message:{title,body},
+       *            body:object|null, features:string[]}}
+       */
+      readInvite(ticket, roomId) {
+        const seen = inspectTicket(ticket, { now: this.clock.wallNow(), room: roomId || null });
+        if (seen.ok) this._invite = { ticket: String(ticket).replace(/\s+/g, ''), body: seen.body, mac: seen.mac, encodedBody: seen.encodedBody };
+        else this._invite = null;
+        return {
+          ok: seen.ok,
+          code: seen.code,
+          message: seen.ok ? null : joinMessage(seen.code),
+          body: seen.body,
+          features: seen.body ? seen.body.ftr.slice() : []
+        };
+      }
+
+      /** Le lien retenu, prêt à être présenté à l'hôte. */
+      inviteClaim() {
+        return this._invite ? { encodedBody: this._invite.encodedBody } : null;
+      }
+
+      /** Réponse au défi de l'hôte. Le MAC du lien ne quitte jamais cet appareil. */
+      answerChallenge(challenge) {
+        if (!this._invite) return null;
+        return proofFor(this._invite.mac, String(challenge || ''), this._invite.encodedBody);
+      }
+
+      /**
+       * L'hôte a admis la candidature : ses droits deviennent ceux de la
+       * partie, le temps de la partie. Rien n'est écrit sur cet appareil.
+       */
+      adoptGuestSession(grant) {
+        grant = grant || {};
+        const expiresAt = this._invite ? this._invite.body.exp * 1000 : (grant.expiresAt || 0);
+        const ok = this.guest.adopt({
+          features: grant.features || [],
+          expiresAt,
+          room: grant.room || (this._invite ? this._invite.body.rid : null),
+          host: grant.host || (this._invite ? this._invite.body.hst : null)
+        });
+        this._emit();
+        return ok;
+      }
+
+      /**
+       * Fin de partie : les droits d'invité disparaissent.
+       *
+       * Le lien, lui, est conservé : il reste valable jusqu'à son échéance et
+       * le siège reste réservé à son porteur côté hôte. L'oublier ici
+       * empêcherait de revenir après une simple coupure.
+       */
+      clearGuestSession() {
+        const etait = this.guest.valid;
+        this.guest.clear();
+        if (etait) this._emit();
+      }
+
+      /** Oublie le lien reçu. Utilisé quand on repart d'une page neuve. */
+      forgetInvite() { this._invite = null; }
+
+      /* ---------------------------------------------------------- */
+      /* Qui peut quoi                                              */
+      /* ---------------------------------------------------------- */
+
+      /**
+       * Peut-on créer une salle ? Cela demande des droits PROPRES :
+       * la session d'invité, elle, n'accorde jamais `session.unlimited`.
+       */
+      canHost() {
+        const own = this._evaluateOwn();
+        return own.unlocked && own.entitlements.has('session.unlimited');
+      }
+
+      /** Peut-on rejoindre une salle ? Un lien valide suffit. */
+      canJoin() {
+        return this.canHost() || !!this._invite || this.guest.valid;
+      }
+
+      /**
+       * Empreinte de la licence de l'hôte, portée par le lien.
+       *
+       * Tronquée et à sens unique : elle sert à rattacher un lien à une
+       * licence pour le support, jamais à la reconstituer.
+       */
+      _licenseDigest() {
+        const lic = this._evaluateOwn().license;
+        return lic && lic.id ? String(lic.id).replace(/[^A-Za-z0-9]/g, '').slice(0, 16).toLowerCase() : '';
       }
     }
 
@@ -4567,8 +5324,9 @@ window.AveriLicense = (function () {
     const { LicenseFacade } = __averiRequire("licensing/facade.js");
     const { PublicLicenseUI } = __averiRequire("ui/public-gate.js");
     const { STATUS, isGranting } = __averiRequire("licensing/status.js");
-    const { GAME_FEATURE_OF, FEATURES, DEMO_DURATION_MS } = __averiRequire("licensing/config.js");
+    const { GAME_FEATURE_OF, FEATURES, DEMO_DURATION_MS, INVITE_TTL_MS } = __averiRequire("licensing/config.js");
     const { formatDuration } = __averiRequire("licensing/clock.js");
+    const { joinMessage, JOIN_REJECT } = __averiRequire("licensing/invitation.js");
 
     let facade = null;
     let ui = null;
@@ -4695,6 +5453,118 @@ window.AveriLicense = (function () {
       return facade ? facade.canOpenConsole() : false;
     }
 
+    /* ---------------------------------------------------------- */
+    /* Salle et lien d'adhésion                                    */
+    /* ----------------------------------------------------------
+       Averi se joue à deux et une seule des deux personnes achète.
+       L'invité n'a donc pas de licence : il a un lien, émis par
+       l'hôte, qui porte les droits de la partie et prouve son
+       origine. Tout se décide ici — le code de jeu ne fait
+       qu'appeler ces fonctions et afficher ce qu'elles renvoient.
+       ---------------------------------------------------------- */
+
+    /** Peut-on créer une salle ? Demande une licence ou une démonstration. */
+    function canHost() {
+      return facade ? facade.canHost() : false;
+    }
+
+    /** Peut-on rejoindre une salle ? Un lien d'adhésion valide suffit. */
+    function canJoin() {
+      return facade ? facade.canJoin() : false;
+    }
+
+    /** Ouvre une salle dont on devient le gardien. */
+    function openRoom(roomId) {
+      return facade ? facade.openRoom(roomId) : { ok: false, reason: 'session.unlimited' };
+    }
+
+    /** Ferme la salle : les liens émis cessent d'être valables. */
+    function closeRoom() {
+      if (facade) facade.closeRoom();
+    }
+
+    /** Émet un lien d'adhésion pour la salle ouverte. */
+    function createInvite(opts) {
+      return facade ? facade.createInvite(opts) : { ok: false, ticket: null, expiresAt: 0, features: [] };
+    }
+
+    /** Durée de vie annoncée d'un lien, pour l'affichage. */
+    function inviteLifetime() {
+      return formatDuration(INVITE_TTL_MS);
+    }
+
+    /** Un invité occupe-t-il déjà le second siège ? */
+    function roomOccupied() {
+      return facade ? facade.roomOccupied() : false;
+    }
+
+    /** Étape 1 de l'admission, côté hôte. */
+    function challengeJoin(claim) {
+      return facade ? facade.challengeJoin(claim) : { ok: false, code: JOIN_REJECT.MISSING, challenge: null };
+    }
+
+    /** Étape 2 de l'admission, côté hôte. */
+    function verifyJoin(proof) {
+      return facade ? facade.verifyJoin(proof) : { ok: false, code: JOIN_REJECT.MISSING, features: null };
+    }
+
+    /** L'invité s'est déconnecté : son siège lui reste réservé. */
+    function guestDisconnected() {
+      if (facade) facade.guestDisconnected();
+    }
+
+    /** Examine un lien reçu. Ne donne aucun droit. */
+    function readInvite(ticket, roomId) {
+      return facade ? facade.readInvite(ticket, roomId)
+                    : { ok: false, code: JOIN_REJECT.MISSING, message: joinMessage(JOIN_REJECT.MISSING), body: null, features: [] };
+    }
+
+    /** Ce que l'invité présente à l'hôte : le corps du lien, jamais son sceau. */
+    function inviteClaim() {
+      return facade ? facade.inviteClaim() : null;
+    }
+
+    /** Réponse au défi de l'hôte. */
+    function answerChallenge(challenge) {
+      return facade ? facade.answerChallenge(challenge) : null;
+    }
+
+    /** L'hôte a admis la candidature : ses droits deviennent ceux de la partie. */
+    function adoptGuestSession(grant) {
+      return facade ? facade.adoptGuestSession(grant) : false;
+    }
+
+    /** Fin de partie : les droits d'invité disparaissent, le lien reste. */
+    function clearGuestSession() {
+      if (facade) facade.clearGuestSession();
+    }
+
+    /** Oublie le lien reçu. */
+    function forgetInvite() {
+      if (facade) facade.forgetInvite();
+    }
+
+    /** Joue-t-on en invité ? */
+    function isGuest() {
+      const s = status();
+      return !!s && s.state === STATUS.GUEST_SESSION;
+    }
+
+    /**
+     * Marque courte de cet appareil, transmise à l'hôte pour lier le
+     * siège à son occupant. Dérivée de l'empreinte déjà affichée dans
+     * l'écran d'activation : elle n'apprend rien de neuf à l'hôte.
+     */
+    function deviceTag() {
+      const s = status();
+      return s ? String(s.deviceCode || '').replace(/[^A-Z0-9]/gi, '').slice(-16).toLowerCase() : '';
+    }
+
+    /** Message affichable pour un refus d'adhésion. */
+    function refusalMessage(code) {
+      return joinMessage(code);
+    }
+
 
 
     __averiExports["boot"] = boot;
@@ -4713,8 +5583,28 @@ window.AveriLicense = (function () {
     __averiExports["openActivation"] = openActivation;
     __averiExports["contactSupport"] = contactSupport;
     __averiExports["canOpenConsole"] = canOpenConsole;
+    __averiExports["canHost"] = canHost;
+    __averiExports["canJoin"] = canJoin;
+    __averiExports["openRoom"] = openRoom;
+    __averiExports["closeRoom"] = closeRoom;
+    __averiExports["createInvite"] = createInvite;
+    __averiExports["inviteLifetime"] = inviteLifetime;
+    __averiExports["roomOccupied"] = roomOccupied;
+    __averiExports["challengeJoin"] = challengeJoin;
+    __averiExports["verifyJoin"] = verifyJoin;
+    __averiExports["guestDisconnected"] = guestDisconnected;
+    __averiExports["readInvite"] = readInvite;
+    __averiExports["inviteClaim"] = inviteClaim;
+    __averiExports["answerChallenge"] = answerChallenge;
+    __averiExports["adoptGuestSession"] = adoptGuestSession;
+    __averiExports["clearGuestSession"] = clearGuestSession;
+    __averiExports["forgetInvite"] = forgetInvite;
+    __averiExports["isGuest"] = isGuest;
+    __averiExports["deviceTag"] = deviceTag;
+    __averiExports["refusalMessage"] = refusalMessage;
     __averiExports["STATUS"] = STATUS;
     __averiExports["DEMO_DURATION_MS"] = DEMO_DURATION_MS;
+    __averiExports["JOIN_REJECT"] = JOIN_REJECT;
     __averiExports["formatDuration"] = formatDuration;
   });
 
@@ -5170,7 +6060,23 @@ function beep(freq = 620, dur = .08, type = 'sine', vol = .05) {
    window.AveriLicense, qui interroge le moteur.
    ========================================================== */
 let LIC = null;            // état de licence courant
-let PEER_FEATURES = null;  // droits annoncés par l'autre joueur
+let PEER_FEATURES = null;  // droits effectifs de la partie, arrêtés à l'admission
+
+/* ----------------------------------------------------------
+   ADHÉSION À UNE SALLE
+   ----------------------------------------------------------
+   Une seule des deux personnes achète. La seconde n'a donc pas
+   de licence : elle a un LIEN, émis par l'hôte, qui porte les
+   droits de la partie et prouve son origine.
+
+   Rien de tout cela ne se décide ici : `window.AveriLicense`
+   émet le lien, l'examine, le vérifie et prononce l'admission.
+   Ce bloc ne fait que transporter les messages et afficher.
+   ---------------------------------------------------------- */
+let INVITE = null;         // lien d'adhésion dont dispose cet appareil
+let HOST_TICKET = null;    // lien émis par l'hôte pour SA salle
+let ADMITTED = false;      // l'admission a-t-elle été prononcée ?
+let PENDING = null;        // candidature en cours de vérification (côté hôte)
 
 /** Manche jouable de mon côté ? */
 function licAllows(gameId) {
@@ -5196,9 +6102,11 @@ function paintGameTiles() {
     const mine = licAllows(id);
     const shared = bothAllow(id);
     tile.classList.toggle('lic-off', !mine || !shared);
+    const invite = window.AveriLicense.isGuest();
     tile.title = mine
       ? (shared ? '' : 'Cette manche n’est pas incluse dans la licence de l’autre joueur.')
-      : 'Cette manche demande une licence.';
+      : (invite ? 'Cette manche n’est pas incluse dans l’invitation que tu as reçue.'
+                : 'Cette manche demande une licence.');
   });
 }
 
@@ -5209,7 +6117,7 @@ function onLicenseLost() {
   render();
 }
 
-let peer = null, conn = null, pingTimer = null, joinTimer = null;
+let peer = null, conn = null, pingTimer = null, joinTimer = null, admitTimer = null;
 let ME = { name: 'Moi', avatar: AVATARS[0], role: 'host' };
 let YOU = { name: null, avatar: '👤' };
 let room = '';
@@ -5263,7 +6171,7 @@ function setConn(txt, cls) { const b = $('connBadge'); if (b) { b.textContent = 
 function send(obj) { try { if (conn && conn.open) conn.send(obj); } catch (e) { console.warn('send', e); } }
 
 function cleanup() {
-  clearInterval(pingTimer); clearTimeout(joinTimer);
+  clearInterval(pingTimer); clearTimeout(joinTimer); clearTimeout(admitTimer);
   if (conn) { try { conn.close(); } catch (e) {} conn = null; }
   if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
 }
@@ -5271,10 +6179,18 @@ function cleanup() {
 function slug(s) { return s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'salle'; }
 
 function start(asHost, targetOverride) {
-  // Créer ou rejoindre une salle est une fonctionnalité protégée :
-  // sans démonstration en cours ni licence, on présente les offres.
-  if (!licCan('session.unlimited')) {
-    window.AveriLicense.promptFor('session.unlimited');
+  // Créer une salle est une fonctionnalité protégée. La REJOINDRE ne
+  // l'est pas : il suffit d'un lien d'adhésion valide, ce qui est tout
+  // l'intérêt du dispositif — la seconde personne n'achète rien.
+  if (asHost) {
+    if (!window.AveriLicense.canHost()) {
+      window.AveriLicense.promptFor('session.unlimited');
+      return;
+    }
+  } else if (!INVITE) {
+    const m = window.AveriLicense.refusalMessage('INVITE_MISSING');
+    setStatus('💌 ' + m.title + ' — ' + m.body, 'warn');
+    toast(m.title, 'bad');
     return;
   }
   const name = $('nameInput').value.trim().slice(0, 16);
@@ -5285,6 +6201,18 @@ function start(asHost, targetOverride) {
   cleanup();
   ME.name = name; ME.role = asHost ? 'host' : 'guest';
   room = slug(code);
+  ADMITTED = false; PENDING = null;
+
+  // L'hôte devient le gardien de sa salle et émet le lien d'adhésion
+  // dans la foulée : il n'y a pas d'instant où la salle est ouverte
+  // sans que l'entrée en soit contrôlée.
+  if (asHost) {
+    const ouverte = window.AveriLicense.openRoom(room);
+    if (!ouverte.ok) { window.AveriLicense.promptFor('session.unlimited'); return; }
+    const inv = window.AveriLicense.createInvite();
+    if (!inv.ok) { toast('Impossible d’ouvrir la salle', 'bad'); return; }
+    HOST_TICKET = inv.ticket;
+  }
   const myId = targetOverride ? ('averi-' + Math.random().toString(36).slice(2, 9))
                               : (asHost ? `averi-${room}-h` : `averi-${room}-g`);
   const target = targetOverride || (asHost ? null : `averi-${room}-h`);
@@ -5297,11 +6225,15 @@ function start(asHost, targetOverride) {
   peer.on('open', (id) => {
     $('myPeerId').textContent = id;
     $('idbox').classList.remove('hidden');
+    $('newLinkBtn').classList.toggle('hidden', !asHost);
     setStatus(asHost ? '🟢 Salle ouverte — en attente de l’autre…' : '🔄 Recherche de l’hôte…', asHost ? 'online' : 'warn');
 
     if (asHost && !targetOverride) {
       peer.on('connection', (c) => {
-        if (conn && conn.open) { try { c.close(); } catch (e) {} return; }
+        // Averi se joue à DEUX. Toute connexion au-delà de la première
+        // est écartée avant d'avoir pu envoyer la moindre donnée de jeu :
+        // le canal est refermé sur un motif explicite.
+        if (conn) { refuse(c, 'ROOM_FULL'); return; }
         conn = c; wireConn(c);
       });
     } else {
@@ -5331,17 +6263,55 @@ function start(asHost, targetOverride) {
   });
 }
 
+/**
+ * Refuse une candidature, en disant pourquoi, puis referme le canal.
+ * Le motif part une fois le canal ouvert : sinon la personne refusée
+ * verrait une déconnexion sèche, sans savoir qu'il lui manque un lien.
+ */
+function refuse(c, code) {
+  const dire = () => {
+    try { c.send({ t: 'denied', code }); } catch (e) {}
+    setTimeout(() => { try { c.close(); } catch (e) {} }, 200);
+  };
+  if (c && c.open) dire();
+  else if (c) c.on('open', dire);
+}
+
 function wireConn(c) {
   c.on('open', () => {
     clearTimeout(joinTimer);
-    setStatus('🟢 Connecté en direct', 'ok');
-    enterGame();
-    send({ t: 'hello', name: ME.name, avatar: ME.avatar, role: ME.role, feat: window.AveriLicense.wireFeatures() });
-    if (isHost()) { G = freshState(); broadcast(); }
-    beep(680, .1); beep(880, .12);
-    burst('hearts', 40);
-    clearInterval(pingTimer);
-    pingTimer = setInterval(() => send({ t: 'ping' }), 20000);
+    // La liaison est ouverte, mais rien n'est encore accordé : l'écran
+    // de jeu n'apparaîtra qu'une fois l'adhésion prononcée.
+    if (isHost()) {
+      setStatus('🔐 Quelqu’un se présente — vérification du lien…', 'warn');
+      // Une candidature qui n'aboutit pas libère la place. Sans cela, un
+      // tiers qui se connecte et se tait garderait la salle pour lui.
+      clearTimeout(admitTimer);
+      admitTimer = setTimeout(() => {
+        if (!ADMITTED) {
+          refuse(c, 'INVITE_MISSING');
+          setStatus('🟢 Salle ouverte — en attente de l’autre…', 'online');
+        }
+      }, 10000);
+    } else {
+      setStatus('🔐 Présentation de ton lien d’invitation…', 'warn');
+      const claim = window.AveriLicense.inviteClaim();
+      if (!claim) { onDenied('INVITE_MISSING'); return; }
+      send({
+        t: 'join', p: claim.encodedBody, dev: window.AveriLicense.deviceTag(),
+        name: ME.name, avatar: ME.avatar
+      });
+      // Un hôte qui ne répond rien ne doit pas laisser l'invité sur un
+      // écran figé : au bout de douze secondes, on le dit.
+      clearTimeout(admitTimer);
+      admitTimer = setTimeout(() => {
+        if (!ADMITTED) {
+          setStatus('⏰ L’hôte n’a pas répondu à ton lien. Demande-lui d’en envoyer un nouveau.', 'err');
+          backHome();
+          setStatus('⏰ L’hôte n’a pas répondu à ton lien. Demande-lui d’en envoyer un nouveau.', 'err');
+        }
+      }, 12000);
+    }
   });
 
   c.on('data', onData);
@@ -5351,29 +6321,124 @@ function wireConn(c) {
     sysMsg('La connexion a été interrompue.');
     toast('Déconnexion', 'bad');
     clearInterval(pingTimer);
+    conn = null;
+    // Le siège reste réservé à l'invité admis : lui seul pourra revenir,
+    // tant que l'hôte n'aura pas émis un nouveau lien.
+    if (isHost()) window.AveriLicense.guestDisconnected();
   });
 
   c.on('error', (e) => { sysMsg('Erreur de liaison : ' + (e.message || e.type)); });
 }
 
+/* ----------------------------------------------------------
+   Adhésion : trois messages, deux vérifications.
+
+   invité → join   (le corps du lien, jamais son sceau)
+   hôte   → chal   (un défi tiré au hasard)
+   invité → proof  (la preuve qu'il détient le lien entier)
+   hôte   → welcome | denied
+
+   Le sceau du lien ne circule donc jamais : l'observer ne
+   suffirait pas à s'en servir.
+   ---------------------------------------------------------- */
+
+/** Fin du parcours : l'admission est prononcée, la partie s'ouvre. */
+function onAdmitted(features, peerName, peerAvatar) {
+  ADMITTED = true;
+  clearTimeout(admitTimer);
+  PEER_FEATURES = Array.isArray(features) ? features.filter(x => typeof x === 'string') : null;
+  if (peerName) { YOU.name = String(peerName).slice(0, 16); YOU.avatar = peerAvatar || '👤'; }
+  $('nameYou').textContent = YOU.name || 'L’autre';
+  $('faceYou').textContent = YOU.avatar;
+  paintGameTiles();
+  enterGame();
+  send({ t: 'hello', name: ME.name, avatar: ME.avatar, role: ME.role });
+  if (isHost()) { G = freshState(); broadcast(); } else { lastSig = ''; render(); }
+  setConn('🟢 ' + (YOU.name || 'L’autre') + ' est là', 'mine');
+  sysMsg((YOU.name || 'L’autre') + ' a rejoint la partie.');
+  toast((YOU.avatar || '👤') + ' ' + (YOU.name || 'L’autre') + ' est connecté·e', 'good');
+  beep(680, .1); beep(880, .12);
+  burst('hearts', 40);
+  clearInterval(pingTimer);
+  pingTimer = setInterval(() => send({ t: 'ping' }), 20000);
+}
+
+/** L'hôte a refusé, ou le lien ne tient pas. */
+function onDenied(code) {
+  const m = window.AveriLicense.refusalMessage(code);
+  setStatus('⛔ ' + m.title + ' — ' + m.body, 'err');
+  toast(m.title, 'bad');
+  beep(220, .16, 'sawtooth');
+  ADMITTED = false;
+  backHome();
+  setStatus('⛔ ' + m.title + ' — ' + m.body, 'err');
+}
+
 function onData(d) {
   if (!d || typeof d !== 'object') return;
+
+  // Avant l'admission, seuls les messages du protocole d'adhésion sont
+  // écoutés : aucune donnée de jeu ne peut être injectée par un pair
+  // qui n'est pas entré.
+  if (!ADMITTED && d.t !== 'join' && d.t !== 'chal' && d.t !== 'proof' &&
+      d.t !== 'welcome' && d.t !== 'denied' && d.t !== 'ping') return;
+
   switch (d.t) {
     case 'ping': return;
+
+    case 'join': {
+      if (!isHost()) return;
+      const r = window.AveriLicense.challengeJoin({ encodedBody: d.p, device: String(d.dev || '') });
+      if (!r.ok) { refuse(conn, r.code); return; }
+      PENDING = { name: String(d.name || 'L’autre').slice(0, 16), avatar: d.avatar || '👤' };
+      send({ t: 'chal', c: r.challenge });
+      break;
+    }
+
+    case 'chal': {
+      if (isHost()) return;
+      const proof = window.AveriLicense.answerChallenge(d.c);
+      if (!proof) { onDenied('INVITE_MISSING'); return; }
+      send({ t: 'proof', p: proof });
+      break;
+    }
+
+    case 'proof': {
+      if (!isHost()) return;
+      const v = window.AveriLicense.verifyJoin(d.p);
+      if (!v.ok) { PENDING = null; refuse(conn, v.code); return; }
+      const invite = PENDING || {};
+      PENDING = null;
+      setStatus('🟢 Salle complète — bonne partie', 'ok');
+      // Les droits de la partie sont ceux du lien que l'hôte a lui-même
+      // émis : rien de ce que l'invité annonce n'entre en ligne de compte.
+      send({ t: 'welcome', feat: v.features, name: ME.name, avatar: ME.avatar });
+      onAdmitted(v.features, invite.name, invite.avatar);
+      break;
+    }
+
+    case 'welcome': {
+      if (isHost()) return;
+      const feat = Array.isArray(d.feat) ? d.feat.filter(x => typeof x === 'string') : [];
+      window.AveriLicense.adoptGuestSession({ features: feat, room });
+      setStatus('🟢 Connecté en direct', 'ok');
+      onAdmitted(feat, d.name, d.avatar);
+      break;
+    }
+
+    case 'denied':
+      // Seul l'hôte prononce un refus. Un invité qui en enverrait un
+      // ne ferait que se déconnecter lui-même.
+      if (isHost()) return;
+      onDenied(String(d.code || 'INVITE_FORGED'));
+      break;
+
     case 'hello':
       YOU.name = String(d.name || 'L’autre').slice(0, 16);
       YOU.avatar = d.avatar || '👤';
-      // Droits annoncés par l'autre joueur. Contrôle de COHÉRENCE
-      // seulement : un pair peut mentir, seul un serveur pourrait
-      // l'en empêcher (voir docs/licensing/security.md).
-      PEER_FEATURES = Array.isArray(d.feat) ? d.feat.filter(x => typeof x === 'string') : null;
-      paintGameTiles();
       $('nameYou').textContent = YOU.name;
       $('faceYou').textContent = YOU.avatar;
-      setConn('🟢 ' + YOU.name + ' est là', 'mine');
-      sysMsg(YOU.name + ' a rejoint la partie.');
-      toast(YOU.avatar + ' ' + YOU.name + ' est connecté·e', 'good');
-      if (isHost()) broadcast(); else { lastSig = ''; render(); }
+      render();
       break;
     case 'chat':
       pushMsg(String(d.text).slice(0, 300), 'you');
@@ -5848,6 +6913,11 @@ function enterGame() {
 function backHome() {
   send({ t: 'bye' });
   cleanup();
+  // La salle se referme et les droits d'invité s'éteignent : sortir de
+  // la partie ne laisse rien derrière soi, d'aucun des deux côtés.
+  if (isHost()) window.AveriLicense.closeRoom();
+  else window.AveriLicense.clearGuestSession();
+  HOST_TICKET = null; ADMITTED = false; PENDING = null;
   G = freshState(); YOU = { name: null, avatar: '👤' }; lastSig = ''; lastSpinSeen = 0;
   PEER_FEATURES = null; paintGameTiles();
   $('screenGame').classList.add('hidden');
@@ -5859,6 +6929,7 @@ function backHome() {
   document.querySelector('.wrap').style.paddingTop = '14px';
   $('createBtn').disabled = $('joinBtn').disabled = $('manualConnectBtn').disabled = false;
   $('idbox').classList.add('hidden');
+  $('newLinkBtn').classList.add('hidden');
   setStatus('🔴 Hors ligne — crée une salle ou rejoins celle de l’autre');
 }
 
@@ -5890,7 +6961,7 @@ function backHome() {
     b.onclick = () => {
       document.querySelectorAll('.av').forEach(x => x.classList.remove('sel'));
       b.classList.add('sel'); ME.avatar = a; beep(700, .05);
-      if (conn && conn.open) send({ t: 'hello', name: ME.name, avatar: ME.avatar, role: ME.role, feat: window.AveriLicense.wireFeatures() });
+      if (conn && conn.open && ADMITTED) send({ t: 'hello', name: ME.name, avatar: ME.avatar, role: ME.role });
     };
     $('avatarPicker').appendChild(b);
   });
@@ -5906,7 +6977,11 @@ function backHome() {
     t.onclick = () => {
       if (!licAllows(g.id)) {
         beep(240, .12, 'sawtooth');
-        window.AveriLicense.promptFor(window.AveriLicense.featureOfGame(g.id));
+        if (window.AveriLicense.isGuest()) {
+          toast('Cette manche n’est pas incluse dans l’invitation reçue', 'bad');
+        } else {
+          window.AveriLicense.promptFor(window.AveriLicense.featureOfGame(g.id));
+        }
         return;
       }
       if (!conn || !conn.open) { toast('Attends que l’autre soit connecté·e', 'bad'); return; }
@@ -5947,9 +7022,24 @@ function backHome() {
   $('roomInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('createBtn').click(); });
 
   $('copyIdBtn').onclick = () => copy($('myPeerId').textContent, 'Identifiant copié');
+
+  /* Le lien d'invitation N'EST PAS une simple adresse : il porte le
+     ticket d'adhésion signé par la salle. C'est lui, et lui seul, qui
+     ouvre la partie à la seconde personne. */
+  function inviteUrl() {
+    return location.href.split('#')[0] + '#r=' + encodeURIComponent(room) + '&i=' + HOST_TICKET;
+  }
   $('copyLinkBtn').onclick = () => {
-    const url = location.origin + location.pathname + '#r=' + encodeURIComponent(room);
-    copy(url, 'Lien d’invitation copié — envoie-le-lui');
+    if (!HOST_TICKET) { toast('Crée d’abord la salle', 'bad'); return; }
+    copy(inviteUrl(), 'Lien d’invitation copié — envoie-le-lui');
+  };
+  $('newLinkBtn').onclick = () => {
+    if (!isHost()) return;
+    const inv = window.AveriLicense.createInvite();
+    if (!inv.ok) { toast('Ouvre d’abord une salle', 'bad'); return; }
+    HOST_TICKET = inv.ticket;
+    copy(inviteUrl(), 'Nouveau lien copié — l’ancien ne vaut plus rien');
+    toast('Ancien lien annulé, place libérée', 'good');
   };
 
   /* Jeu */
@@ -5963,12 +7053,35 @@ function backHome() {
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && chatOpen) toggleChat(false); });
   $('dock').classList.add('hidden');
 
-  /* Invitation par lien */
-  const m = location.hash.match(/[#&]r=([^&]+)/);
-  if (m) {
-    $('roomInput').value = decodeURIComponent(m[1]);
-    setStatus('💌 Invitation détectée — mets ton prénom puis « Rejoindre »', 'warn');
-    $('nameInput').focus();
+  /* ----------------------------------------------------------
+     Invitation par lien
+
+     Le lien est examiné AVANT toute connexion : forme, version,
+     en-tête de clé publique, échéance, salle. Tout ce qui est
+     vérifiable sans la clé de la salle l'est ici ; l'authenticité,
+     elle, ne peut l'être que par l'hôte, et le sera à la connexion.
+     ---------------------------------------------------------- */
+  const mRoom = location.hash.match(/[#&]r=([^&]*)/);
+  const mInv = location.hash.match(/[#&]i=([^&]*)/);
+  if (mRoom) $('roomInput').value = decodeURIComponent(mRoom[1]);
+  if (mInv) {
+    const salle = mRoom ? slug(decodeURIComponent(mRoom[1])) : null;
+    const lu = window.AveriLicense.readInvite(decodeURIComponent(mInv[1]), salle);
+    if (lu.ok) {
+      INVITE = true;
+      // Le lien sait à quelle salle il appartient : autant remplir le
+      // champ plutôt que de laisser recopier un code à la main.
+      if (!mRoom) $('roomInput').value = lu.body.rid;
+      const n = lu.features.filter(f => f.indexOf('game.') === 0).length;
+      setStatus('💌 Invitation valide — ' + n + ' manche' + (n > 1 ? 's' : '') +
+                ' t’attendent. Mets ton prénom, puis « Rejoindre ».', 'ok');
+      $('nameInput').focus();
+    } else {
+      setStatus('⛔ ' + lu.message.title + ' — ' + lu.message.body, 'err');
+    }
+  } else if (mRoom) {
+    const m0 = window.AveriLicense.refusalMessage('INVITE_MISSING');
+    setStatus('💌 ' + m0.title + ' — ' + m0.body, 'warn');
   }
 
   /* Filet de sécurité si le CDN PeerJS n’a pas répondu */
