@@ -1,0 +1,21 @@
+{
+  "name": "averi",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Averi — jeu à deux en pair-à-pair, avec licensing offline-first.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "node --test tests/",
+    "keygen": "node tools/license-generator/cli.mjs keygen",
+    "license": "node tools/license-generator/cli.mjs",
+    "plans": "node tools/license-generator/cli.mjs plans",
+    "audit:secrets": "node tools/audit-secrets.mjs",
+    "check": "node tools/build.mjs && node --test tests/ && node tools/audit-secrets.mjs",
+    "build:web": "node tools/dist.mjs"
+  }
+}
